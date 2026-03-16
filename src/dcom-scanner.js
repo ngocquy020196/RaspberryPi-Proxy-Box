@@ -10,6 +10,7 @@ const execAsync = promisify(exec);
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 
 // Huawei USB Vendor ID
 const HUAWEI_VENDOR_ID = '12d1';
@@ -39,6 +40,12 @@ const HUAWEI_MODEM_PRODUCTS = {
  * For Stick/PPP: USB serial from ttyUSB sysfs → IMEI via AT → bus path
  */
 async function getDeviceID(interfaceName, atPort) {
+  const raw = await _getRawDeviceID(interfaceName, atPort);
+  if (raw === 'N/A') return 'N/A';
+  return hashId(raw);
+}
+
+async function _getRawDeviceID(interfaceName, atPort) {
   // 1. Real MAC address (works for HiLink/USB ethernet)
   try {
     const { stdout } = await execAsync(`cat /sys/class/net/${interfaceName}/address 2>/dev/null`);
@@ -87,6 +94,10 @@ async function getDeviceID(interfaceName, atPort) {
   }
 
   return 'N/A';
+}
+
+function hashId(raw) {
+  return crypto.createHash('md5').update(raw).digest('hex').substring(0, 8);
 }
 
 /**
