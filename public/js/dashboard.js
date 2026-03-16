@@ -104,11 +104,23 @@
     });
   }
 
+  // ---- API Helper with 401 redirect ----
+
+  async function apiFetch(url, options = {}) {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      window.location.href = '/';
+      return null;
+    }
+    return res;
+  }
+
   // ---- API Calls ----
 
   async function loadDevices() {
     try {
-      const res = await fetch('/api/devices');
+      const res = await apiFetch('/api/devices');
+      if (!res) return;
       const data = await res.json();
       if (data.success) {
         devices = data.devices;
@@ -124,7 +136,8 @@
 
   async function loadSystemInfo() {
     try {
-      const res = await fetch('/api/system');
+      const res = await apiFetch('/api/system');
+      if (!res) return;
       const data = await res.json();
       if (data.success) {
         elements.hostname.textContent = data.info.hostname;
@@ -140,7 +153,8 @@
 
   async function loadProxyConfig() {
     try {
-      const res = await fetch('/api/proxy/config');
+      const res = await apiFetch('/api/proxy/config');
+      if (!res) return;
       const data = await res.json();
       if (data.success) {
         proxyConfig = data.config;
@@ -183,7 +197,7 @@
           <td>${index + 1}</td>
           <td><strong>${device.interfaceName}</strong><br><small class="text-muted">${device.type || ''}</small></td>
           <td class="ip-cell">${device.ip}</td>
-          <td class="ip-cell">${device.gateway}</td>
+          <td class="ip-cell">${device.localIP || device.ip}</td>
           <td class="port-cell">${port}</td>
           <td class="auth-cell"><span class="proxy-string" title="${proxyString}">${user}:${realPass}</span></td>
           <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
@@ -258,18 +272,20 @@
     const port = config.port || 10000;
     const user = config.username || 'proxyuser';
     const pass = config.password || 'proxypass';
+    const localIP = window.location.hostname;
+    const tsIP = tailscaleIP;
 
     elements.connectInfo.innerHTML = `
-      <p style="margin-bottom: 8px; color: var(--text-secondary);">Use these settings to connect through your proxy:</p>
+      <p style="margin-bottom: 12px; color: var(--text-secondary); font-weight: 600;">Quick Connect — Proxy Settings</p>
       <div class="connect-example">
-        <div><strong style="color: var(--text-secondary);"># HTTP Proxy (curl)</strong></div>
-        <div>curl -x http://${user}:${pass}@YOUR_PI_IP:${port} https://api.ipify.org</div>
+        ${tsIP ? `<div><strong style="color: var(--primary);">🌐 Tailscale (anywhere)</strong></div>
+        <div>curl -x http://${user}:${pass}@${tsIP}:${port} https://api.ipify.org</div>
+        <br>` : ''}
+        <div><strong style="color: var(--text-secondary);">📡 Local Network</strong></div>
+        <div>curl -x http://${user}:${pass}@${localIP}:${port} https://api.ipify.org</div>
         <br>
-        <div><strong style="color: var(--text-secondary);"># SOCKS5 Proxy (curl)</strong></div>
-        <div>curl --socks5 ${user}:${pass}@YOUR_PI_IP:${port + 1000} https://api.ipify.org</div>
-        <br>
-        <div><strong style="color: var(--text-secondary);"># Browser / System Proxy Settings</strong></div>
-        <div>Host: YOUR_PI_IP &nbsp; Port: ${port} &nbsp; User: ${user} &nbsp; Pass: ${pass}</div>
+        <div><strong style="color: var(--text-secondary);">⚙️ SwitchyOmega / Browser Proxy</strong></div>
+        <div>Host: ${tsIP || localIP} &nbsp; Port: ${port} &nbsp; User: ${user} &nbsp; Pass: ${pass}</div>
       </div>
     `;
   }
