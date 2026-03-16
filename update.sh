@@ -102,9 +102,23 @@ log "dcom-proxy started"
 info "Waiting for modem auto-connect (10s)..."
 sleep 10
 
+# Update DDNS service
+chmod +x "$INSTALL_DIR/scripts/ddns-update.sh" 2>/dev/null
+cp "$INSTALL_DIR/systemd/ddns-update.service" /etc/systemd/system/ 2>/dev/null
+cp "$INSTALL_DIR/systemd/ddns-update.timer" /etc/systemd/system/ 2>/dev/null
+systemctl daemon-reload
+systemctl enable ddns-update.timer > /dev/null 2>&1
+systemctl restart ddns-update.timer > /dev/null 2>&1
+
+# Run DDNS update
+if grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
+  bash "$INSTALL_DIR/scripts/ddns-update.sh"
+fi
+
 # Check results
 PI_IP=$(hostname -I | awk '{print $1}')
 PPP_UP=$(ip -4 addr show ppp0 2>/dev/null | grep -oP 'inet \K[\d.]+')
+DDNS_DOMAIN=$(grep "CF_DDNS_DOMAIN=" "$INSTALL_DIR/.env" 2>/dev/null | cut -d= -f2)
 
 echo ""
 echo -e "${GREEN}✅ Update complete!${NC}"
@@ -113,6 +127,9 @@ if [ -n "$PPP_UP" ]; then
   echo -e "   🌐 PPP0 IP:   ${CYAN}${PPP_UP}${NC}"
   PROXY_STATUS=$(sudo systemctl is-active 3proxy 2>/dev/null)
   echo -e "   🔌 3proxy:    ${CYAN}${PROXY_STATUS}${NC}"
+fi
+if [ -n "$DDNS_DOMAIN" ]; then
+  echo -e "   🌍 DDNS:      ${CYAN}${DDNS_DOMAIN}${NC}"
 fi
 echo -e "   📄 Logs:      ${CYAN}sudo journalctl -u dcom-proxy -f${NC}"
 echo ""

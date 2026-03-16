@@ -1,0 +1,10 @@
+[Unit]
+Description=Run DDNS updater every 5 minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
