@@ -25,5 +25,8 @@ nscache 65536
 # Max connections
 maxconn 500
 
+# Listen on all interfaces (WiFi, Tailscale, localhost)
+internal 0.0.0.0
+
 # ===== PROXY ENTRIES (auto-generated below) =====
 # {{PROXY_ENTRIES}}
