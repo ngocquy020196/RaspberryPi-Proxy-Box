@@ -266,28 +266,6 @@ systemctl enable 3proxy.service > /dev/null 2>&1
 systemctl restart dcom-proxy.service
 log "All services started"
 
-# ========================================
-# STEP 9: Cloudflare DDNS Setup
-# ========================================
-progress "Setting up Cloudflare DDNS"
-
-# Copy DDNS script
-chmod +x "$INSTALL_DIR/scripts/ddns-update.sh" 2>/dev/null
-
-# Install DDNS systemd files
-cp "$INSTALL_DIR/systemd/ddns-update.service" /etc/systemd/system/
-cp "$INSTALL_DIR/systemd/ddns-update.timer" /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable ddns-update.timer > /dev/null 2>&1
-systemctl start ddns-update.timer > /dev/null 2>&1
-
-# Run DDNS update now if config exists
-if grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
-  bash "$INSTALL_DIR/scripts/ddns-update.sh"
-  log "DDNS configured and first update done"
-else
-  warn "DDNS skipped — set CF_API_TOKEN and CF_ZONE_ID in .env to enable"
-fi
 
 # ========================================
 # STEP 10: Tailscale VPN (Remote Proxy Access)
