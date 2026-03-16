@@ -290,7 +290,35 @@ else
 fi
 
 # ========================================
-# STEP 9: Cloudflare Tunnel (Interactive)
+# STEP 10: Tailscale VPN (Remote Proxy Access)
+# ========================================
+progress "Installing Tailscale"
+
+if command -v tailscale &> /dev/null; then
+  TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "not connected")
+  warn "Tailscale already installed (IP: $TAILSCALE_IP)"
+else
+  curl -fsSL https://tailscale.com/install.sh | sh
+  systemctl enable tailscaled > /dev/null 2>&1
+  systemctl start tailscaled > /dev/null 2>&1
+  log "Tailscale installed"
+  
+  echo ""
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "  Tailscale lets you access proxy from ANYWHERE"
+  echo -e "  without opening ports on your router."
+  echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo -e "${YELLOW}Run this command to connect Tailscale:${NC}"
+  echo -e "  ${GREEN}sudo tailscale up${NC}"
+  echo ""
+  echo -e "Then install Tailscale on your Mac/PC and use the"
+  echo -e "Tailscale IP as proxy server in SwitchyOmega."
+  echo ""
+fi
+
+# ========================================
+# STEP 11: Cloudflare Tunnel (Interactive)
 # ========================================
 progress "Cloudflare Tunnel Setup"
 
