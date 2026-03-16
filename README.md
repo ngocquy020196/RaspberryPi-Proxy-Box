@@ -125,6 +125,61 @@ Required for proxy access from outside your network:
 
 ---
 
+## 🔑 External API
+
+Authenticated with `SECRET_KEY` (same as dashboard login password). Pass via header or query param.
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/ext/api/devices?key=API_KEY` | List all devices |
+| GET | `/ext/api/device/:deviceID?key=API_KEY` | Get device status & proxy info by Device ID |
+| GET | `/ext/api/rotate/:deviceID?key=API_KEY` | Rotate IP by Device ID |
+
+### Device ID
+
+Each device gets a unique identifier:
+- **HiLink modems**: MAC address (e.g., `aa:bb:cc:dd:ee:ff`)
+- **Stick modems**: IMEI via AT command (e.g., `IMEI:860000000000000`)
+- **Fallback**: USB serial number or bus path
+
+### Examples
+
+```bash
+# List all devices
+curl -H "x-api-key: YOUR_KEY" https://proxy.yourdomain.com/ext/api/devices
+
+# Get device by ID
+curl "https://proxy.yourdomain.com/ext/api/device/IMEI:860000000000000?key=YOUR_KEY"
+
+# Rotate IP
+curl "https://proxy.yourdomain.com/ext/api/rotate/IMEI:860000000000000?key=YOUR_KEY"
+```
+
+### Response Example
+
+```json
+{
+  "success": true,
+  "device": {
+    "mac": "IMEI:860000000000000",
+    "interface": "ppp0",
+    "publicIP": "113.185.72.162",
+    "localIP": "10.173.0.1",
+    "status": "active",
+    "proxy": {
+      "host": "proxy-ddns.yourdomain.com",
+      "port": 10000,
+      "username": "proxyuser",
+      "password": "proxypass"
+    }
+  }
+}
+```
+
+---
+
 ## 📁 Project Structure
 
 ```

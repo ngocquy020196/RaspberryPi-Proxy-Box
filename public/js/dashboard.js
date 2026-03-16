@@ -323,7 +323,7 @@
         <div>GET ${baseUrl}/ext/api/device/${encodeURIComponent(sampleMac)}?key=API_KEY</div>
         <br>
         <div><strong style="color: var(--primary);">🔄 Rotate IP by MAC</strong></div>
-        <div>POST ${baseUrl}/ext/api/rotate/${encodeURIComponent(sampleMac)}?key=API_KEY</div>
+        <div>GET ${baseUrl}/ext/api/rotate/${encodeURIComponent(sampleMac)}?key=API_KEY</div>
         <br>
         <div><strong style="color: var(--text-secondary);">💡 curl example</strong></div>
         <div>curl -H "x-api-key: API_KEY" ${baseUrl}/ext/api/devices</div>

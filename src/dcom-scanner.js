@@ -34,33 +34,44 @@ const HUAWEI_MODEM_PRODUCTS = {
 };
 
 /**
- * Get MAC address for a network interface
- * PPP interfaces don't have MAC, so we use USB bus ID as stable identifier
+ * Get unique device ID for a network interface
+ * Priority: real MAC → IMEI (AT command) → USB serial → USB bus path
  */
-async function getMACAddress(interfaceName) {
+async function getDeviceID(interfaceName, atPort) {
+  // 1. Real MAC address (works for HiLink/USB ethernet)
   try {
-    // Try to get real MAC address (works for eth/usb interfaces)
     const { stdout } = await execAsync(`cat /sys/class/net/${interfaceName}/address 2>/dev/null`);
     const mac = stdout.trim();
     if (mac && mac !== '00:00:00:00:00:00') return mac;
   } catch {}
 
-  // For PPP interfaces, get USB device serial as stable ID
+  // 2. IMEI via AT command (unique per modem, best for PPP/stick)
+  if (atPort) {
+    try {
+      const { stdout } = await execAsync(
+        `echo -e "AT+CGSN\\r" | timeout 3 socat - ${atPort},b115200,raw,echo=0 2>/dev/null`
+      );
+      const imeiMatch = stdout.match(/(\d{15})/);
+      if (imeiMatch) return `IMEI:${imeiMatch[1]}`;
+    } catch {}
+  }
+
+  // 3. USB device serial number
   try {
     const { stdout } = await execAsync(
-      `ls /sys/class/net/${interfaceName}/device/../../serial 2>/dev/null && cat /sys/class/net/${interfaceName}/device/../../serial 2>/dev/null || echo ""`
+      `find /sys/class/net/${interfaceName}/ -name serial 2>/dev/null | head -1 | xargs cat 2>/dev/null`
     );
     const serial = stdout.trim();
-    if (serial) return `USB:${serial}`;
+    if (serial) return `SN:${serial}`;
   } catch {}
 
-  // Fallback: use USB bus path
+  // 4. USB bus path (changes if plugged into different port)
   try {
     const { stdout } = await execAsync(
-      `readlink -f /sys/class/net/${interfaceName} 2>/dev/null | grep -oP 'usb\\d+/[\\d.-]+' | head -1`
+      `udevadm info -q property /sys/class/net/${interfaceName} 2>/dev/null | grep ID_PATH= | cut -d= -f2`
     );
-    const busPath = stdout.trim();
-    if (busPath) return `BUS:${busPath}`;
+    const path = stdout.trim();
+    if (path) return `PATH:${path}`;
   } catch {}
 
   return 'N/A';
@@ -79,7 +90,7 @@ async function scanDevices() {
   for (const iface of networkInterfaces) {
     const ipInfo = await getInterfaceIP(iface);
     const gatewayIP = await getGatewayIP(iface);
-    const mac = await getMACAddress(iface);
+    const mac = await getDeviceID(iface);
 
     devices.push({
       interfaceName: iface,
@@ -110,7 +121,7 @@ async function scanDevices() {
       if (pppIface) {
         const ipInfo = await getInterfaceIP(pppIface);
         const publicIP = ipInfo.ip ? await getPublicIP(pppIface) : null;
-        const mac = await getMACAddress(pppIface);
+        const mac = await getDeviceID(pppIface, group.atPort);
         devices.push({
           interfaceName: pppIface,
           ip: publicIP || ipInfo.ip || 'N/A',

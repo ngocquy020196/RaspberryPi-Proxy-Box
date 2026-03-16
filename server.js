@@ -281,8 +281,8 @@ app.get('/ext/api/device/:mac', requireApiKey, async (req, res) => {
   }
 });
 
-// POST /ext/api/rotate/:mac — rotate IP by MAC
-app.post('/ext/api/rotate/:mac', requireApiKey, async (req, res) => {
+// GET /ext/api/rotate/:mac — rotate IP by MAC
+app.get('/ext/api/rotate/:mac', requireApiKey, async (req, res) => {
   try {
     const mac = decodeURIComponent(req.params.mac);
     const devices = await dcomScanner.scanDevices();
@@ -296,7 +296,7 @@ app.post('/ext/api/rotate/:mac', requireApiKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Device not active' });
     }
 
-    let method = req.body?.method || process.env.IP_ROTATE_METHOD || 'hilink';
+    let method = req.query.method || process.env.IP_ROTATE_METHOD || 'hilink';
     if (device.interfaceName.startsWith('ppp')) {
       method = 'interface';
     }
