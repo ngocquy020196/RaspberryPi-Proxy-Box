@@ -343,20 +343,18 @@ OK 'ATD*99#'
 CONNECT ''
 `;
 
-  // Create pppd peer config
+  // Create pppd peer config (no nodetach — must run as daemon!)
   const peerContent = `${serialPort}
 460800
 connect "/usr/sbin/chat -v -f ${chatScript}"
 noauth
 defaultroute
-replacedefaultroute
 usepeerdns
 persist
 maxfail 3
 holdoff 10
 noipdefault
-nodetach
-debug
+logfile /var/log/ppp-${peerName}.log
 `;
 
   try {
@@ -370,8 +368,8 @@ debug
     await execAsync(`pkill -f "pppd.*${serialPort}" 2>/dev/null`).catch(() => {});
     await new Promise(r => setTimeout(r, 1000));
 
-    // Start pppd in background
-    await execAsync(`pppd call ${peerName} &>/var/log/ppp-${peerName}.log &`);
+    // Start pppd as daemon (no nodetach = auto-backgrounds)
+    await execAsync(`pppd call ${peerName}`);
     console.log(`[dcom-scanner] pppd started for ${peerName}`);
 
     // Wait for PPP interface to get IP

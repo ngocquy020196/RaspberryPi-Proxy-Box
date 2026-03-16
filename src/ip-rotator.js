@@ -153,8 +153,8 @@ async function rotatePPP(interfaceName) {
 
     console.log(`[ip-rotator] Redialing ${peerName}...`);
 
-    // Redial
-    await execAsync(`sudo pppd call ${peerName} &>/var/log/ppp-${peerName}.log &`);
+    // Redial (pppd auto-forks since no nodetach in peer config)
+    await execAsync(`sudo pppd call ${peerName}`);
 
     // Wait for new IP
     let retries = 20;
