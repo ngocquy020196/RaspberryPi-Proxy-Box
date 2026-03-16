@@ -1,73 +1,79 @@
 # DCOM Proxy Box — Setup Guide
 
-Hướng dẫn cài đặt và cấu hình hệ thống Raspberry Pi 4G Proxy Box.
+Complete guide to install and configure the Raspberry Pi 4G Proxy Box system.
 
-## 1. Cài đặt tự động
+## 1. Automated Installation
 
 ```bash
-# Clone hoặc copy project lên Raspberry Pi
-cd /opt/dcom-proxy    # hoặc thư mục bạn chọn
+# Option A: One-line install (recommended)
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/ngocquy020196/RaspberryPi-Proxy-Box/main/setup.sh)"
 
-# Chạy setup script (cần quyền root)
+# Option B: Clone and install
+git clone https://github.com/ngocquy020196/RaspberryPi-Proxy-Box.git /opt/dcom-proxy
+cd /opt/dcom-proxy
 sudo bash setup.sh
 ```
 
-Script sẽ tự động cài:
+The script automatically installs:
 - Node.js 18 LTS
-- 3proxy (compile từ source)
-- cloudflared
-- usb-modeswitch (cho Vodafone K5160)
+- 3proxy (compiled from source)
+- cloudflared (Cloudflare Tunnel client)
+- usb-modeswitch (for Vodafone K5160 / Huawei E3372)
 
-## 2. Cấu hình
+## 2. Configuration
 
 ```bash
-# Mở file config
+# Edit config file
 nano .env
 ```
 
-Thay đổi các giá trị quan trọng:
-| Variable | Mô tả | Mặc định |
-|----------|--------|----------|
-| `SECRET_KEY` | Mật khẩu đăng nhập dashboard | `changeme123` |
-| `PORT` | Port web dashboard | `8080` |
-| `PROXY_START_PORT` | Port bắt đầu cho proxy | `10000` |
-| `IP_ROTATE_METHOD` | Phương thức xoay IP | `hilink` |
+Key settings:
 
-## 3. Khởi động
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SECRET_KEY` | Dashboard login password | Auto-generated |
+| `PORT` | Web dashboard port | `8080` |
+| `PROXY_START_PORT` | Starting port for proxies | `10000` |
+| `IP_ROTATE_METHOD` | IP rotation method (`hilink` / `interface` / `at_command`) | `hilink` |
+
+## 3. Starting Services
 
 ```bash
 # Start services
 sudo systemctl start 3proxy
 sudo systemctl start dcom-proxy
 
-# Kiểm tra status
+# Check status
 sudo systemctl status dcom-proxy
 
-# Xem logs
+# View logs
 sudo journalctl -u dcom-proxy -f
 ```
 
-Truy cập: `http://<PI_IP>:8080`
+Access dashboard: `http://<PI_IP>:8080`
 
-## 4. Cấu hình Cloudflare Tunnel (Remote Access cho Dashboard)
+## 4. Cloudflare Tunnel Setup (Remote Dashboard Access)
 
-### Bước 1: Đăng nhập Cloudflare
+> **Note:** The installer asks if you want to configure this automatically during setup. If you chose "No", follow these manual steps.
+
+### Step 1: Login to Cloudflare
 ```bash
 cloudflared tunnel login
 ```
+A browser link will appear. Open it to authenticate with your Cloudflare account.
 
-### Bước 2: Tạo Tunnel
+### Step 2: Create a Tunnel
 ```bash
 cloudflared tunnel create dcom-proxy
 ```
 
-### Bước 3: Cấu hình DNS
+### Step 3: Route DNS
 ```bash
-# Trỏ subdomain về tunnel
+# Point your subdomain to the tunnel
 cloudflared tunnel route dns dcom-proxy proxy.yourdomain.com
 ```
 
-### Bước 4: Tạo config file
+### Step 4: Create Config File
 ```bash
 cat > ~/.cloudflared/config.yml << EOF
 tunnel: <TUNNEL_ID>
@@ -80,29 +86,29 @@ ingress:
 EOF
 ```
 
-### Bước 5: Chạy tunnel
+### Step 5: Run the Tunnel
 ```bash
-# Chạy thử
+# Test run
 cloudflared tunnel run dcom-proxy
 
-# Cài đặt như service (auto-start)
+# Install as system service (auto-start on boot)
 sudo cloudflared service install
 sudo systemctl enable cloudflared
 sudo systemctl start cloudflared
 ```
 
-Truy cập: `https://proxy.yourdomain.com`
+Access remotely: `https://proxy.yourdomain.com`
 
-## 5. Remote Access cho Proxy Ports
+## 5. Remote Access for Proxy Ports
 
-### Phương án A: Cloudflare TCP Tunnel (Khuyên dùng)
+### Option A: Cloudflare TCP Tunnel (Recommended)
 
-Thêm vào `config.yml`:
+Add to `config.yml`:
 ```yaml
 ingress:
   - hostname: proxy.yourdomain.com
     service: http://localhost:8080
-  # Thêm TCP tunnel cho mỗi proxy port
+  # Add TCP tunnel for each proxy port
   - hostname: p1.yourdomain.com
     service: tcp://localhost:10000
   - hostname: p2.yourdomain.com
@@ -110,69 +116,69 @@ ingress:
   - service: http_status:404
 ```
 
-Client kết nối qua `cloudflared access tcp`:
+Client connection via `cloudflared access tcp`:
 ```bash
 cloudflared access tcp --hostname p1.yourdomain.com --url localhost:10000
-# Sau đó dùng proxy: localhost:10000
+# Then use proxy: localhost:10000
 ```
 
-### Phương án B: Tailscale (Đơn giản nhất)
+### Option B: Tailscale (Simplest)
 
 ```bash
-# Trên Raspberry Pi
+# On Raspberry Pi
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 
-# Trên máy client
-# Cài Tailscale → Join cùng network
-# Dùng Tailscale IP của Pi làm proxy host
+# On client machine
+# Install Tailscale → Join the same network
+# Use Tailscale IP of Pi as proxy host
 ```
 
-### Phương án C: Port Forwarding (Router)
+### Option C: Port Forwarding (Router)
 
-Nếu có IP Public tĩnh:
-1. Vào trang quản trị Router
-2. Forward port `8080` (dashboard) và `10000-100XX` (proxy ports) về IP nội bộ của Pi
-3. Kết nối qua: `http://<PUBLIC_IP>:8080`
+If you have a static public IP:
+1. Go to your Router admin panel
+2. Forward port `8080` (dashboard) and `10000-100XX` (proxy ports) to Pi's local IP
+3. Connect via: `http://<PUBLIC_IP>:8080`
 
-> ⚠️ Không khuyến khích nếu không có tường lửa phù hợp.
+> ⚠️ Not recommended without proper firewall configuration.
 
 ## 6. Troubleshooting
 
-### USB Dcom không nhận
+### USB Dcom Not Detected
 ```bash
-# Kiểm tra USB
+# Check USB devices
 lsusb | grep -i huawei
 
-# Nếu hiện product ID 14fe (CD-ROM mode):
+# If product ID shows 14fe (CD-ROM mode):
 sudo usb_modeswitch -v 0x12d1 -p 0x14fe \
   -M 55534243123456780000000000000a11062000000000000100000000000000
 
-# Kiểm tra lại
+# Verify switch
 lsusb | grep -i huawei
-# Phải chuyển sang product ID 1506 (Modem mode)
+# Should now show product ID 1506 (Modem mode)
 ```
 
-### Không có network interface mới
+### No New Network Interface
 ```bash
-# Kiểm tra interfaces
+# Check interfaces
 ip link show
 
-# Kiểm tra dmesg
+# Check kernel messages
 dmesg | tail -30 | grep -i usb
 ```
 
-### IP không đổi sau khi rotate
-- Thử đổi `IP_ROTATE_METHOD` trong `.env`:
-  - `hilink`: Cho K5160 HiLink mode (mặc định)
+### IP Doesn't Change After Rotation
+- Try changing `IP_ROTATE_METHOD` in `.env`:
+  - `hilink`: For K5160 HiLink mode (default)
   - `interface`: Restart network interface
-  - `at_command`: Gửi AT commands qua serial
+  - `at_command`: Send AT commands via serial port
 
-### 3proxy không start
+### 3proxy Won't Start
 ```bash
-# Kiểm tra config
+# Check config syntax
 3proxy /etc/3proxy/3proxy.cfg
 
-# Kiểm tra logs
+# Check logs
 cat /var/log/3proxy/3proxy.log
 ```

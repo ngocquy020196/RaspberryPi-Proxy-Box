@@ -1,8 +1,8 @@
 #!/bin/bash
 # ============================================
 # DCOM Proxy Box — ONE-COMMAND INSTALLER
-# Chỉ cần 1 lệnh: sudo bash setup.sh
-# Tự động cài đặt + cấu hình + khởi động
+# Just run: sudo bash setup.sh
+# Auto install + configure + start everything
 # ============================================
 
 set -e
@@ -21,22 +21,22 @@ info() { echo -e "${CYAN}[i]${NC} $1"; }
 
 # Must run as root
 if [ "$EUID" -ne 0 ]; then
-  err "Chạy bằng root: sudo bash setup.sh"
+  err "Please run as root: sudo bash setup.sh"
 fi
 
-# ---- Online mode: nếu chạy từ curl | bash thì tự clone repo ----
+# ---- Online mode: if run via curl | bash, clone repo first ----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
 if [ ! -f "${SCRIPT_DIR}/package.json" ] 2>/dev/null; then
-  echo -e "${CYAN}[i]${NC} Đang chạy online mode — clone repo..."
+  echo -e "${CYAN}[i]${NC} Running in online mode — cloning repo..."
   INSTALL_DIR="/opt/dcom-proxy"
   apt-get update -y -qq && apt-get install -y -qq git > /dev/null 2>&1
   if [ -d "$INSTALL_DIR/.git" ]; then
     cd "$INSTALL_DIR" && git pull --quiet
-    echo -e "${GREEN}[✓]${NC} Đã cập nhật repo tại $INSTALL_DIR"
+    echo -e "${GREEN}[✓]${NC} Updated repo at $INSTALL_DIR"
   else
     rm -rf "$INSTALL_DIR"
     git clone --quiet https://github.com/ngocquy020196/RaspberryPi-Proxy-Box.git "$INSTALL_DIR"
-    echo -e "${GREEN}[✓]${NC} Đã clone repo vào $INSTALL_DIR"
+    echo -e "${GREEN}[✓]${NC} Cloned repo to $INSTALL_DIR"
   fi
   cd "$INSTALL_DIR"
   exec bash "$INSTALL_DIR/setup.sh"
@@ -67,41 +67,41 @@ progress() {
 # ========================================
 # STEP 1: Update system
 # ========================================
-progress "Cập nhật hệ thống"
+progress "Updating system"
 apt-get update -y -qq
 apt-get upgrade -y -qq
-log "Hệ thống đã cập nhật"
+log "System updated"
 
 # ========================================
 # STEP 2: Install essential tools
 # ========================================
-progress "Cài đặt công cụ cần thiết"
+progress "Installing essential tools"
 apt-get install -y -qq \
   curl wget git build-essential \
   net-tools iproute2 usbutils \
   usb-modeswitch usb-modeswitch-data \
   sg3-utils ppp minicom \
   iptables > /dev/null 2>&1
-log "Công cụ đã cài đặt"
+log "Essential tools installed"
 
 # ========================================
 # STEP 3: Install Node.js 18 LTS
 # ========================================
-progress "Cài đặt Node.js 18"
+progress "Installing Node.js 18"
 if command -v node &> /dev/null; then
-  warn "Node.js đã có: $(node -v)"
+  warn "Node.js already installed: $(node -v)"
 else
   curl -fsSL https://deb.nodesource.com/setup_18.x | bash - > /dev/null 2>&1
   apt-get install -y -qq nodejs > /dev/null 2>&1
-  log "Node.js $(node -v) đã cài đặt"
+  log "Node.js $(node -v) installed"
 fi
 
 # ========================================
 # STEP 4: Build & install 3proxy
 # ========================================
-progress "Cài đặt 3proxy"
+progress "Installing 3proxy"
 if command -v 3proxy &> /dev/null || [ -f /usr/local/bin/3proxy ]; then
-  warn "3proxy đã có"
+  warn "3proxy already installed"
 else
   cd /tmp
   rm -rf 3proxy-src
@@ -112,7 +112,7 @@ else
   make -f Makefile.Linux install > /dev/null 2>&1
   cd "$INSTALL_DIR"
   rm -rf /tmp/3proxy-src
-  log "3proxy đã build và cài đặt"
+  log "3proxy built and installed"
 fi
 
 # Create 3proxy directories
@@ -122,25 +122,25 @@ mkdir -p /var/log/3proxy
 # ========================================
 # STEP 5: Install cloudflared
 # ========================================
-progress "Cài đặt cloudflared"
+progress "Installing cloudflared"
 if command -v cloudflared &> /dev/null; then
-  warn "cloudflared đã có"
+  warn "cloudflared already installed"
 else
   ARCH=$(dpkg --print-architecture)
   if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ] || [ "$ARCH" = "amd64" ]; then
     curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}.deb" -o /tmp/cloudflared.deb
     dpkg -i /tmp/cloudflared.deb > /dev/null 2>&1
     rm -f /tmp/cloudflared.deb
-    log "cloudflared đã cài đặt"
+    log "cloudflared installed"
   else
-    warn "Kiến trúc không hỗ trợ ($ARCH) — cài cloudflared thủ công"
+    warn "Unsupported architecture ($ARCH) — install cloudflared manually"
   fi
 fi
 
 # ========================================
-# STEP 6: Setup ứng dụng
+# STEP 6: Setup application
 # ========================================
-progress "Cấu hình ứng dụng"
+progress "Configuring application"
 cd "$INSTALL_DIR"
 
 # Auto-generate .env if not exists
@@ -176,21 +176,21 @@ IP_ROTATE_METHOD=hilink
 DEFAULT_PROXY_USER=proxyuser
 DEFAULT_PROXY_PASS=proxypass
 EOF
-  log "File .env đã tạo tự động"
-  info "SECRET_KEY được tạo ngẫu nhiên: ${SECRET_KEY}"
+  log ".env file generated"
+  info "Random SECRET_KEY: ${SECRET_KEY}"
 else
-  warn "File .env đã tồn tại — giữ nguyên"
+  warn ".env already exists — keeping current config"
   SECRET_KEY=$(grep SECRET_KEY .env | head -1 | cut -d'=' -f2)
 fi
 
 # Install npm dependencies
 npm install --production --silent 2>/dev/null
-log "Dependencies đã cài đặt"
+log "Dependencies installed"
 
 # ========================================
 # STEP 7: USB Modeswitch rules
 # ========================================
-progress "Cấu hình USB Modeswitch cho K5160"
+progress "Configuring USB Modeswitch for K5160"
 
 mkdir -p /etc/usb_modeswitch.d
 
@@ -208,12 +208,12 @@ ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="14f
 EOF
 
 udevadm control --reload-rules 2>/dev/null || true
-log "USB modeswitch + udev rules đã cấu hình"
+log "USB modeswitch + udev rules configured"
 
 # ========================================
 # STEP 8: Install & start systemd services
 # ========================================
-progress "Cài đặt và khởi động services"
+progress "Installing and starting services"
 
 # dcom-proxy service
 cat > /etc/systemd/system/dcom-proxy.service << EOF
@@ -259,35 +259,35 @@ systemctl daemon-reload
 systemctl enable dcom-proxy.service > /dev/null 2>&1
 systemctl enable 3proxy.service > /dev/null 2>&1
 systemctl restart dcom-proxy.service
-log "Tất cả services đã khởi động"
+log "All services started"
 
 # ========================================
 # STEP 9: Cloudflare Tunnel (Interactive)
 # ========================================
-progress "Cấu hình Cloudflare Tunnel"
+progress "Cloudflare Tunnel Setup"
 
 echo ""
-echo -e "${CYAN}Cloudflare Tunnel cho phép truy cập Dashboard từ xa qua domain.${NC}"
-echo -e "${YELLOW}Yêu cầu: Bạn cần có tài khoản Cloudflare và domain đã trỏ về CF.${NC}"
+echo -e "${CYAN}Cloudflare Tunnel allows you to access the Dashboard remotely via your domain.${NC}"
+echo -e "${YELLOW}Requires: A Cloudflare account and a domain pointed to Cloudflare.${NC}"
 echo ""
-read -p "Bạn có muốn cấu hình Cloudflare Tunnel ngay không? (y/N): " CF_CHOICE
+read -p "Would you like to configure Cloudflare Tunnel now? (y/N): " CF_CHOICE
 
 if [ "$CF_CHOICE" = "y" ] || [ "$CF_CHOICE" = "Y" ]; then
   # Step 9a: Login
   echo ""
-  info "Bước 1/4: Đăng nhập Cloudflare"
-  info "Trình duyệt sẽ mở — hãy đăng nhập và chọn domain."
-  info "Nếu dùng SSH không có trình duyệt, copy link hiện ra rồi mở trên máy khác."
+  info "Step 1/4: Login to Cloudflare"
+  info "A browser link will open — log in and select your domain."
+  info "If using SSH without a browser, copy the link and open it on another device."
   echo ""
   cloudflared tunnel login
   
   if [ $? -eq 0 ]; then
-    log "Đăng nhập thành công"
+    log "Login successful"
     
     # Step 9b: Create tunnel
-    info "Bước 2/4: Tạo tunnel"
+    info "Step 2/4: Creating tunnel"
     TUNNEL_NAME="dcom-proxy"
-    cloudflared tunnel create $TUNNEL_NAME 2>/dev/null || warn "Tunnel '$TUNNEL_NAME' có thể đã tồn tại"
+    cloudflared tunnel create $TUNNEL_NAME 2>/dev/null || warn "Tunnel '$TUNNEL_NAME' may already exist"
     
     # Get tunnel ID
     TUNNEL_ID=$(cloudflared tunnel list 2>/dev/null | grep $TUNNEL_NAME | awk '{print $1}' | head -1)
@@ -297,16 +297,16 @@ if [ "$CF_CHOICE" = "y" ] || [ "$CF_CHOICE" = "Y" ]; then
       
       # Step 9c: Get domain from user
       echo ""
-      info "Bước 3/4: Cấu hình domain"
-      read -p "Nhập subdomain (VD: proxy.yourdomain.com): " CF_DOMAIN
+      info "Step 3/4: Configure domain"
+      read -p "Enter subdomain (e.g., proxy.yourdomain.com): " CF_DOMAIN
       
       if [ -n "$CF_DOMAIN" ]; then
         # Route DNS
-        cloudflared tunnel route dns $TUNNEL_NAME $CF_DOMAIN 2>/dev/null || warn "DNS route có thể đã tồn tại"
-        log "Đã trỏ $CF_DOMAIN → tunnel"
+        cloudflared tunnel route dns $TUNNEL_NAME $CF_DOMAIN 2>/dev/null || warn "DNS route may already exist"
+        log "Routed $CF_DOMAIN → tunnel"
         
         # Step 9d: Generate config.yml
-        info "Bước 4/4: Tạo config và cài service"
+        info "Step 4/4: Generating config and installing service"
         CRED_FILE=$(ls /root/.cloudflared/*.json 2>/dev/null | head -1)
         
         mkdir -p /root/.cloudflared
@@ -319,26 +319,26 @@ ingress:
     service: http://localhost:8080
   - service: http_status:404
 CFEOF
-        log "Config đã tạo tại /root/.cloudflared/config.yml"
+        log "Config created at /root/.cloudflared/config.yml"
         
         # Install as service
         cloudflared service install 2>/dev/null || true
         systemctl enable cloudflared 2>/dev/null || true
         systemctl restart cloudflared 2>/dev/null || true
-        log "Cloudflare Tunnel đã khởi động"
+        log "Cloudflare Tunnel started"
         
         CF_URL="https://${CF_DOMAIN}"
       else
-        warn "Bỏ qua — không nhập domain"
+        warn "Skipped — no domain entered"
       fi
     else
-      warn "Không tìm thấy Tunnel ID — cấu hình thủ công sau"
+      warn "Tunnel ID not found — configure manually later"
     fi
   else
-    warn "Đăng nhập thất bại — cấu hình Cloudflare sau: xem docs/SETUP_GUIDE.md"
+    warn "Login failed — configure Cloudflare later: see docs/SETUP_GUIDE.md"
   fi
 else
-  info "Bỏ qua Cloudflare Tunnel — cấu hình sau: xem docs/SETUP_GUIDE.md"
+  info "Skipped Cloudflare Tunnel — configure later: see docs/SETUP_GUIDE.md"
 fi
 
 # ========================================
@@ -348,7 +348,7 @@ echo ""
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║                                                  ║${NC}"
-echo -e "${GREEN}║   ${BOLD}✅ CÀI ĐẶT HOÀN TẤT!${NC}${GREEN}                         ║${NC}"
+echo -e "${GREEN}║   ${BOLD}✅ INSTALLATION COMPLETE!${NC}${GREEN}                      ║${NC}"
 echo -e "${GREEN}║                                                  ║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║${NC}                                                  ${GREEN}║${NC}"
@@ -356,16 +356,16 @@ echo -e "${GREEN}║${NC}  📡 Dashboard (LAN):  ${CYAN}http://${PI_IP}:8080${N
 if [ -n "$CF_URL" ]; then
 echo -e "${GREEN}║${NC}  🌍 Dashboard (WAN):  ${CYAN}${CF_URL}${NC}"
 fi
-echo -e "${GREEN}║${NC}  🔑 Mật khẩu:  ${YELLOW}${SECRET_KEY}${NC}              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  🔑 Password:  ${YELLOW}${SECRET_KEY}${NC}"
 echo -e "${GREEN}║${NC}                                                  ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  📂 Thư mục:   ${INSTALL_DIR}${NC}"
+echo -e "${GREEN}║${NC}  📂 Directory: ${INSTALL_DIR}${NC}"
 echo -e "${GREEN}║${NC}  📄 Logs:      ${CYAN}sudo journalctl -u dcom-proxy -f${NC}"
 echo -e "${GREEN}║${NC}                                                  ${GREEN}║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════╣${NC}"
-echo -e "${GREEN}║${NC}  ${BOLD}Tiếp theo:${NC}                                       ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  1. Cắm USB Dcom vào hub                         ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  2. Mở dashboard bằng trình duyệt                ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  3. Đăng nhập bằng mật khẩu ở trên              ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  ${BOLD}Next steps:${NC}                                       ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  1. Plug USB Dcom into the hub                    ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  2. Open dashboard in your browser                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  3. Login with the password above                 ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}                                                  ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
