@@ -54,7 +54,8 @@
 
   async function init() {
     setupEventListeners();
-    await Promise.all([loadDevices(), loadSystemInfo(), loadProxyConfig()]);
+    await Promise.all([loadDevices(), loadSystemInfo(), loadProxyConfig(), loadApiKey()]);
+    renderApiReference();
     startAutoRefresh();
   }
 
@@ -106,6 +107,7 @@
 
   // ---- State ----
   let ddnsDomain = '';
+  let apiKey = '';
 
   // ---- API Helper with 401 redirect ----
 
@@ -287,6 +289,66 @@
         <div>Host: ${proxyHost} &nbsp; Port: ${port} &nbsp; User: ${user} &nbsp; Pass: ${pass}</div>
       </div>
     `;
+  }
+
+  async function loadApiKey() {
+    try {
+      const res = await apiFetch('/api/key');
+      if (!res) return;
+      const data = await res.json();
+      if (data.success) apiKey = data.key;
+    } catch {}
+  }
+
+  function renderApiReference() {
+    const el = document.getElementById('apiReference');
+    if (!el) return;
+
+    const host = ddnsDomain || window.location.hostname;
+    const port = window.location.port || '8080';
+    const baseUrl = `http://${host}:${port}`;
+    const sampleMac = devices.length > 0 ? (devices[0].macAddress || 'MAC_ID') : 'MAC_ID';
+    const maskedKey = apiKey ? apiKey.substring(0, 6) + '...' : 'YOUR_KEY';
+
+    el.innerHTML = `
+      <div style="margin-bottom: 10px;">
+        <strong style="color: var(--text-secondary);">🔑 API Key:</strong>
+        <code id="apiKeyDisplay" style="background: var(--bg-tertiary); padding: 2px 8px; border-radius: 4px; cursor: pointer;" title="Click to copy">${maskedKey}</code>
+        <button class="btn btn-sm btn-outline" id="showApiKeyBtn" style="margin-left: 6px; font-size: 11px;">Show</button>
+        <button class="btn btn-sm btn-accent" id="copyApiKeyBtn" style="margin-left: 4px; font-size: 11px;">Copy</button>
+      </div>
+      <div class="connect-example" style="font-size: 13px;">
+        <div><strong style="color: var(--primary);">📋 List all devices</strong></div>
+        <div>GET ${baseUrl}/ext/api/devices?key=API_KEY</div>
+        <br>
+        <div><strong style="color: var(--primary);">🔍 Get device by MAC</strong></div>
+        <div>GET ${baseUrl}/ext/api/device/${encodeURIComponent(sampleMac)}?key=API_KEY</div>
+        <br>
+        <div><strong style="color: var(--primary);">🔄 Rotate IP by MAC</strong></div>
+        <div>POST ${baseUrl}/ext/api/rotate/${encodeURIComponent(sampleMac)}?key=API_KEY</div>
+        <br>
+        <div><strong style="color: var(--text-secondary);">💡 curl example</strong></div>
+        <div>curl -H "x-api-key: API_KEY" ${baseUrl}/ext/api/devices</div>
+      </div>
+    `;
+
+    // Show/Copy API key handlers
+    document.getElementById('showApiKeyBtn')?.addEventListener('click', () => {
+      const display = document.getElementById('apiKeyDisplay');
+      if (display.textContent === maskedKey) {
+        display.textContent = apiKey;
+      } else {
+        display.textContent = maskedKey;
+      }
+    });
+
+    document.getElementById('copyApiKeyBtn')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(apiKey).then(() => {
+        const btn = document.getElementById('copyApiKeyBtn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1500);
+      });
+    });
   }
 
   function getStatusClass(status) {

@@ -61,6 +61,11 @@ app.get('/api/system', async (req, res) => {
   }
 });
 
+// Get API key for external API reference
+app.get('/api/key', (req, res) => {
+  res.json({ success: true, key: process.env.SECRET_KEY || '' });
+});
+
 // Get proxy config for all devices
 app.get('/api/proxy/config', (req, res) => {
   try {
