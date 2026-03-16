@@ -24,7 +24,26 @@ if [ "$EUID" -ne 0 ]; then
   err "Chạy bằng root: sudo bash setup.sh"
 fi
 
-INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+# ---- Online mode: nếu chạy từ curl | bash thì tự clone repo ----
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+if [ ! -f "${SCRIPT_DIR}/package.json" ] 2>/dev/null; then
+  echo -e "${CYAN}[i]${NC} Đang chạy online mode — clone repo..."
+  INSTALL_DIR="/opt/dcom-proxy"
+  apt-get update -y -qq && apt-get install -y -qq git > /dev/null 2>&1
+  if [ -d "$INSTALL_DIR/.git" ]; then
+    cd "$INSTALL_DIR" && git pull --quiet
+    echo -e "${GREEN}[✓]${NC} Đã cập nhật repo tại $INSTALL_DIR"
+  else
+    rm -rf "$INSTALL_DIR"
+    git clone --quiet https://github.com/ngocquy020196/RaspberryPi-Proxy-Box.git "$INSTALL_DIR"
+    echo -e "${GREEN}[✓]${NC} Đã clone repo vào $INSTALL_DIR"
+  fi
+  cd "$INSTALL_DIR"
+  exec bash "$INSTALL_DIR/setup.sh"
+  exit 0
+fi
+
+INSTALL_DIR="$SCRIPT_DIR"
 PI_IP=$(hostname -I | awk '{print $1}')
 
 clear
