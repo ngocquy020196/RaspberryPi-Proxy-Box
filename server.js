@@ -15,6 +15,9 @@ const ipRotator = require('./src/ip-rotator');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// ---- Uptime tracking (in-memory) ----
+const uptimeStore = {}; // { interfaceName: connectedAt timestamp }
+
 // ---- Middleware ----
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -44,6 +47,18 @@ app.use('/api', auth.requireAuth);
 app.get('/api/devices', async (req, res) => {
   try {
     const devices = await dcomScanner.scanDevices();
+    // Track uptime: if device is active and not tracked, start timer
+    for (const d of devices) {
+      if (d.status === 'active' && !uptimeStore[d.interfaceName]) {
+        uptimeStore[d.interfaceName] = Date.now();
+      } else if (d.status !== 'active') {
+        delete uptimeStore[d.interfaceName];
+      }
+      d.connectedAt = uptimeStore[d.interfaceName] || null;
+      d.uptime = uptimeStore[d.interfaceName]
+        ? Math.floor((Date.now() - uptimeStore[d.interfaceName]) / 1000)
+        : 0;
+    }
     res.json({ success: true, devices });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -183,6 +198,7 @@ app.post('/api/rotate/:interfaceName', async (req, res) => {
       method = 'interface'; // PPP always uses interface restart
     }
     const result = await ipRotator.rotateIP(interfaceName, method);
+    uptimeStore[interfaceName] = Date.now(); // reset uptime
     res.json({ success: true, result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -202,6 +218,7 @@ app.post('/api/rotate-all', async (req, res) => {
           method = 'interface';
         }
         const result = await ipRotator.rotateIP(device.interfaceName, method);
+        uptimeStore[device.interfaceName] = Date.now();
         results.push({ interface: device.interfaceName, ...result });
       } catch (err) {
         results.push({ interface: device.interfaceName, success: false, error: err.message });
@@ -302,6 +319,7 @@ app.get('/ext/api/rotate/:mac', requireApiKey, async (req, res) => {
     }
 
     const result = await ipRotator.rotateIP(device.interfaceName, method);
+    uptimeStore[device.interfaceName] = Date.now(); // reset uptime
     res.json({ success: true, result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

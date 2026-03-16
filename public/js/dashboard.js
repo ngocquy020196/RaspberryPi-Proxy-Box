@@ -174,7 +174,7 @@
     if (devices.length === 0) {
       elements.deviceTableBody.innerHTML = `
         <tr>
-            <td colspan="9" class="empty-state">
+            <td colspan="10" class="empty-state">
             <div class="empty-content">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
               <p>No devices detected. Plug in a USB Dcom.</p>
@@ -206,6 +206,7 @@
           <td class="port-cell">${port}</td>
           <td class="auth-cell"><span class="proxy-string" title="${proxyString}">${user}:${realPass}</span></td>
           <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+          <td><small>${formatUptime(device.uptime)}</small></td>
           <td>
             <div class="action-group">
               ${device.status === 'disconnected' && device.type === 'stick' ? `
@@ -347,6 +348,18 @@
         setTimeout(() => btn.textContent = 'Copy', 1500);
       });
     });
+  }
+
+  function formatUptime(seconds) {
+    if (!seconds || seconds <= 0) return '—';
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
   }
 
   function getStatusClass(status) {
