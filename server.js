@@ -251,7 +251,7 @@ app.get('/ext/api/devices', requireApiKey, async (req, res) => {
     res.json({
       success: true,
       devices: devices.map(d => ({
-        mac: d.macAddress,
+        deviceId: d.deviceId,
         interface: d.interfaceName,
         publicIP: d.ip,
         localIP: d.localIP || d.ip,
@@ -269,7 +269,7 @@ app.get('/ext/api/device/:mac', requireApiKey, async (req, res) => {
   try {
     const mac = decodeURIComponent(req.params.mac);
     const devices = await dcomScanner.scanDevices();
-    const device = devices.find(d => d.macAddress === mac);
+    const device = devices.find(d => d.deviceId === mac);
 
     if (!device) {
       return res.status(404).json({ success: false, error: 'Device not found' });
@@ -279,7 +279,7 @@ app.get('/ext/api/device/:mac', requireApiKey, async (req, res) => {
     res.json({
       success: true,
       device: {
-        mac: device.macAddress,
+        deviceId: device.deviceId,
         interface: device.interfaceName,
         publicIP: device.ip,
         localIP: device.localIP || device.ip,
@@ -303,7 +303,7 @@ app.get('/ext/api/rotate/:mac', requireApiKey, async (req, res) => {
   try {
     const mac = decodeURIComponent(req.params.mac);
     const devices = await dcomScanner.scanDevices();
-    const device = devices.find(d => d.macAddress === mac);
+    const device = devices.find(d => d.deviceId === mac);
 
     if (!device) {
       return res.status(404).json({ success: false, error: 'Device not found' });

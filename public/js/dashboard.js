@@ -200,7 +200,7 @@
         <tr data-interface="${device.interfaceName}">
           <td>${index + 1}</td>
           <td><strong>${device.interfaceName}</strong><br><small class="text-muted">${device.type || ''}</small></td>
-          <td class="ip-cell"><small>${device.macAddress || 'N/A'}</small></td>
+          <td class="ip-cell"><small>${device.deviceId || 'N/A'}</small></td>
           <td class="ip-cell">${device.ip}</td>
           <td class="ip-cell">${device.localIP || device.ip}</td>
           <td class="port-cell">${port}</td>
@@ -321,7 +321,7 @@
     if (!el) return;
 
     const baseUrl = window.location.origin;
-    const sampleId = devices.length > 0 ? (devices[0].macAddress || 'DEVICE_ID') : 'DEVICE_ID';
+    const sampleId = devices.length > 0 ? (devices[0].deviceId || 'DEVICE_ID') : 'DEVICE_ID';
     const key = apiKey || 'YOUR_KEY';
 
     const endpoints = [
