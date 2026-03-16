@@ -170,7 +170,10 @@
       const config = proxyConfig[device.interfaceName] || {};
       const port = config.port || (10000 + index);
       const user = config.username || 'proxyuser';
-      const pass = config.password || '••••';
+      const pass = config.password || 'proxypass';
+      const realPass = config.password || 'proxypass';
+      const proxyHost = window.location.hostname;
+      const proxyString = `${user}:${realPass}@${proxyHost}:${port}`;
       const statusClass = getStatusClass(device.status);
       const statusLabel = getStatusLabel(device.status);
 
@@ -181,7 +184,7 @@
           <td class="ip-cell">${device.ip}</td>
           <td class="ip-cell">${device.gateway}</td>
           <td class="port-cell">${port}</td>
-          <td class="auth-cell">${user}:${pass}</td>
+          <td class="auth-cell"><span class="proxy-string" title="${proxyString}">${user}:${realPass}</span></td>
           <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
           <td>
             <div class="action-group">
@@ -194,6 +197,9 @@
               </button>
               <button class="btn btn-sm btn-outline config-btn" data-interface="${device.interfaceName}" data-port="${port}" data-user="${user}" data-pass="${config.password || ''}" data-type="${config.type || 'http'}" title="Configure">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09"/></svg>
+              </button>
+              <button class="btn btn-sm btn-outline copy-btn" data-proxy="${proxyString}" title="Copy proxy string">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
             </div>
           </td>
@@ -211,6 +217,10 @@
 
     document.querySelectorAll('.connect-btn').forEach(btn => {
       btn.addEventListener('click', () => connectPPP(btn.dataset.index, btn.dataset.port));
+    });
+
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => copyProxy(btn));
     });
 
     // Show connect info for first active device
@@ -311,6 +321,26 @@
 
     // Refresh after rotation
     setTimeout(() => loadDevices(), 2000);
+  }
+
+  function copyProxy(btn) {
+    const proxyStr = btn.dataset.proxy;
+    navigator.clipboard.writeText(proxyStr).then(() => {
+      showToast(`Copied: ${proxyStr}`, 'success');
+      // Visual feedback
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+    }).catch(() => {
+      // Fallback for non-HTTPS
+      const input = document.createElement('input');
+      input.value = proxyStr;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      showToast(`Copied: ${proxyStr}`, 'success');
+    });
   }
 
   async function connectPPP(index, serialPort) {
