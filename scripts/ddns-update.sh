@@ -14,11 +14,11 @@ fi
 # Cloudflare API config (from .env)
 CF_API_TOKEN="${CF_API_TOKEN:-}"
 CF_ZONE_ID="${CF_ZONE_ID:-}"
-CF_RECORD_NAME="${CF_DDNS_DOMAIN:-proxy-ddns.ngocquy.dev}"
+CF_RECORD_NAME="${CF_DDNS_DOMAIN:-}"
 
 # Validate config
-if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ZONE_ID" ]; then
-  echo "[ddns] Skipped — CF_API_TOKEN and CF_ZONE_ID not set"
+if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ZONE_ID" ] || [ -z "$CF_RECORD_NAME" ]; then
+  echo "[ddns] Skipped — CF_API_TOKEN, CF_ZONE_ID, and CF_DDNS_DOMAIN must be set"
   exit 0
 fi
 
