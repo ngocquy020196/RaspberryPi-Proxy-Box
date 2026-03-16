@@ -322,39 +322,59 @@ async function switchModemMode(vendorId, productId) {
 }
 
 /**
- * Connect a stick-mode modem via wvdial/PPP
+ * Connect a stick-mode modem via pppd (replaces wvdial which segfaults on Pi)
  */
 async function connectStickModem(serialPort, pppIndex = 0) {
-  const wvdialConf = `/tmp/wvdial-ppp${pppIndex}.conf`;
   const pppIface = `ppp${pppIndex}`;
+  const peerName = `dcom${pppIndex}`;
+  const chatScript = `/etc/chatscripts/${peerName}`;
+  const peerFile = `/etc/ppp/peers/${peerName}`;
 
-  // Generate wvdial config
-  const config = `[Dialer dcom${pppIndex}]
-Init1 = ATZ
-Init2 = ATQ0 V1 E1 S0=0
-Init3 = AT+CGDCONT=1,"IP","internet"
-Modem Type = Analog Modem
-Baud = 460800
-New PPPD = yes
-Modem = ${serialPort}
-Phone = *99#
-Username = " "
-Password = " "
-Stupid Mode = 1
-Auto DNS = 1
+  // Create chatscript
+  const chatContent = `ABORT 'BUSY'
+ABORT 'NO CARRIER'
+ABORT 'NO DIALTONE'
+ABORT 'ERROR'
+ABORT 'NO ANSWER'
+TIMEOUT 30
+'' 'ATZ'
+OK 'AT+CGDCONT=1,"IP","internet"'
+OK 'ATD*99#'
+CONNECT ''
 `;
 
-  fs.writeFileSync(wvdialConf, config, 'utf-8');
-  console.log(`[dcom-scanner] wvdial config written: ${wvdialConf}`);
+  // Create pppd peer config
+  const peerContent = `${serialPort}
+460800
+connect "/usr/sbin/chat -v -f ${chatScript}"
+noauth
+defaultroute
+replacedefaultroute
+usepeerdns
+persist
+maxfail 3
+holdoff 10
+noipdefault
+nodetach
+debug
+`;
 
   try {
-    // Kill any existing wvdial for this port
-    await execAsync(`pkill -f "wvdial.*dcom${pppIndex}" 2>/dev/null`).catch(() => {});
-    
-    // Start wvdial in background
-    await execAsync(`wvdial -C ${wvdialConf} dcom${pppIndex} &>/var/log/wvdial-ppp${pppIndex}.log &`);
-    
-    // Wait for PPP interface to appear
+    // Write config files
+    fs.mkdirSync('/etc/chatscripts', { recursive: true });
+    fs.writeFileSync(chatScript, chatContent, 'utf-8');
+    fs.writeFileSync(peerFile, peerContent, 'utf-8');
+    console.log(`[dcom-scanner] pppd config written: ${peerFile}`);
+
+    // Kill any existing pppd for this port
+    await execAsync(`pkill -f "pppd.*${serialPort}" 2>/dev/null`).catch(() => {});
+    await new Promise(r => setTimeout(r, 1000));
+
+    // Start pppd in background
+    await execAsync(`pppd call ${peerName} &>/var/log/ppp-${peerName}.log &`);
+    console.log(`[dcom-scanner] pppd started for ${peerName}`);
+
+    // Wait for PPP interface to get IP
     let retries = 15;
     while (retries > 0) {
       await new Promise(r => setTimeout(r, 2000));
@@ -366,8 +386,9 @@ Auto DNS = 1
       retries--;
     }
 
-    return { success: false, message: 'PPP dial timed out — check /var/log/wvdial-ppp*.log' };
+    return { success: false, message: `PPP dial timed out — check /var/log/ppp-${peerName}.log` };
   } catch (error) {
+    console.error(`[dcom-scanner] PPP connect error:`, error.message);
     return { success: false, error: error.message };
   }
 }
@@ -377,7 +398,10 @@ Auto DNS = 1
  */
 async function disconnectPPP(pppIndex = 0) {
   try {
-    await execAsync(`pkill -f "wvdial.*dcom${pppIndex}" 2>/dev/null`);
+    const peerName = `dcom${pppIndex}`;
+    await execAsync(`pkill -f "pppd.*${peerName}" 2>/dev/null`).catch(() => {});
+    await execAsync(`pkill -f "pppd.*/dev/ttyUSB" 2>/dev/null`).catch(() => {});
+    console.log(`[dcom-scanner] PPP ${pppIndex} disconnected`);
     return { success: true };
   } catch {
     return { success: false };
@@ -395,3 +419,4 @@ module.exports = {
   disconnectPPP,
   getSerialPorts,
 };
+
