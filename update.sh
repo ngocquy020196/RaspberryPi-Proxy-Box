@@ -102,6 +102,15 @@ log "dcom-proxy started"
 info "Waiting for modem auto-connect (10s)..."
 sleep 10
 
+# 8. Install Tailscale if not present
+if ! command -v tailscale &> /dev/null; then
+  info "Installing Tailscale..."
+  curl -fsSL https://tailscale.com/install.sh | sh
+  systemctl enable tailscaled > /dev/null 2>&1
+  systemctl start tailscaled > /dev/null 2>&1
+  log "Tailscale installed — run 'sudo tailscale up' to connect"
+fi
+
 # Check results
 PI_IP=$(hostname -I | awk '{print $1}')
 PPP_UP=$(ip -4 addr show ppp0 2>/dev/null | grep -oP 'inet \K[\d.]+')
