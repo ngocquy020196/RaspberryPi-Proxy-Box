@@ -37,7 +37,7 @@ log "Code updated"
 
 # 2. Install system dependencies
 info "Checking system packages..."
-apt-get install -y -qq wvdial ppp usb-modeswitch usbutils > /dev/null 2>&1
+apt-get install -y -qq wvdial ppp usb-modeswitch usbutils socat > /dev/null 2>&1
 log "System packages OK"
 
 # 3. Install npm dependencies

@@ -10,6 +10,13 @@ Complete guide to install and configure the Raspberry Pi 4G Proxy Box system.
 - **Powered USB Hub** — required for multiple Dcoms
 - **USB 4G Dcom** — Vodafone K5160 / Huawei E3372
 
+The installer automatically installs:
+- Node.js 18 LTS
+- 3proxy (compiled from source)
+- cloudflared (Cloudflare Tunnel client)
+- usb-modeswitch, ppp, wvdial
+- socat (for IMEI/Device ID detection via AT commands)
+
 ### Wiring
 ```
 Power Supply → Pi → USB Hub (powered) → Dcom 1, Dcom 2, ...
