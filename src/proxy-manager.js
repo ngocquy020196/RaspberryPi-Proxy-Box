@@ -69,9 +69,12 @@ function generateConfig(devices) {
   const configs = loadDeviceConfigs();
   const proxyEntries = [];
 
+  let activeCount = 0;
+
   devices.forEach((device, index) => {
     if (device.status !== 'active' || !device.ip || device.ip === 'N/A') return;
 
+    activeCount++;
     const iface = device.interfaceName;
     const deviceConfig = configs[iface] || {};
     const port = deviceConfig.port || (PROXY_START_PORT + index);
@@ -112,6 +115,10 @@ function generateConfig(devices) {
     }
   });
 
+  if (activeCount === 0) {
+    proxyEntries.push('# No active devices — 3proxy will not be started');
+  }
+
   saveDeviceConfigs(configs);
 
   // Replace placeholder in template
@@ -120,7 +127,7 @@ function generateConfig(devices) {
     proxyEntries.join('\n')
   );
 
-  return finalConfig;
+  return { config: finalConfig, activeCount };
 }
 
 /**
@@ -132,12 +139,12 @@ async function regenerateAndReload(devices) {
     devices = await dcomScanner.scanDevices();
   }
 
-  const config = generateConfig(devices);
+  const { config, activeCount } = generateConfig(devices);
 
   // Write config file
   try {
     fs.writeFileSync(CONFIG_PATH, config, 'utf-8');
-    console.log(`[proxy-manager] Config written to ${CONFIG_PATH}`);
+    console.log(`[proxy-manager] Config written to ${CONFIG_PATH} (${activeCount} active devices)`);
   } catch (error) {
     // If permission denied, try with sudo
     const tmpPath = '/tmp/3proxy.cfg';
@@ -146,19 +153,29 @@ async function regenerateAndReload(devices) {
     console.log(`[proxy-manager] Config written to ${CONFIG_PATH} (via sudo)`);
   }
 
+  // Skip 3proxy reload if no active devices
+  if (activeCount === 0) {
+    console.log('[proxy-manager] No active devices — skipping 3proxy reload');
+    // Stop 3proxy if running to avoid stale config
+    try {
+      await execAsync('sudo systemctl stop 3proxy 2>/dev/null');
+    } catch {}
+    return { success: true, message: 'No active devices — 3proxy stopped' };
+  }
+
   // Reload 3proxy
   try {
-    await execAsync('sudo systemctl reload 3proxy 2>/dev/null || sudo systemctl restart 3proxy');
-    console.log('[proxy-manager] 3proxy reloaded');
-    return { success: true, message: '3proxy config applied and reloaded' };
+    await execAsync('sudo systemctl restart 3proxy');
+    console.log('[proxy-manager] 3proxy restarted');
+    return { success: true, message: `3proxy running with ${activeCount} proxy(s)` };
   } catch (error) {
-    console.error('[proxy-manager] Error reloading 3proxy:', error.message);
-    // Try direct process signal
+    console.error('[proxy-manager] Error restarting 3proxy:', error.message);
+    // Try direct start
     try {
-      await execAsync('sudo killall -HUP 3proxy');
-      return { success: true, message: '3proxy config applied (HUP signal sent)' };
+      await execAsync(`sudo 3proxy ${CONFIG_PATH} &`);
+      return { success: true, message: '3proxy started directly' };
     } catch {
-      return { success: false, message: 'Config written but 3proxy reload failed — may need manual restart' };
+      return { success: false, message: 'Config written but 3proxy start failed — check logs' };
     }
   }
 }

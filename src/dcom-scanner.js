@@ -98,24 +98,67 @@ async function detectUSBModems() {
 
 /**
  * Get modem-related network interfaces
- * Filters out lo, wlan, and the primary eth0
+ * Uses both include patterns and sysfs USB detection
  */
 async function getModemInterfaces() {
   try {
-    const { stdout } = await execAsync("ip -o link show | awk -F': ' '{print $2}'");
-    const allInterfaces = stdout.trim().split('\n').map(i => i.trim());
+    // Method 1: Find USB network interfaces via sysfs (most reliable)
+    let usbInterfaces = [];
+    try {
+      const { stdout: sysfsOut } = await execAsync(
+        "ls -d /sys/class/net/*/device/driver 2>/dev/null | cut -d'/' -f5"
+      );
+      const sysfsIfaces = sysfsOut.trim().split('\n').filter(i => i);
+      
+      for (const iface of sysfsIfaces) {
+        // Check if this interface is a USB device
+        try {
+          const { stdout: devPath } = await execAsync(
+            `readlink -f /sys/class/net/${iface}/device 2>/dev/null`
+          );
+          if (devPath.includes('/usb')) {
+            usbInterfaces.push(iface);
+          }
+        } catch {}
+      }
+    } catch {}
 
-    // Filter: keep only modem-type interfaces
-    // Typically: eth1, eth2, usb0, usb1, wwan0, enx* (USB ethernet)
-    const excluded = ['lo', 'wlan0', 'wlan1', 'eth0', 'docker0', 'br-'];
-    
-    return allInterfaces.filter(iface => {
-      if (!iface) return false;
+    // Method 2: Pattern matching on interface names (fallback)
+    const { stdout } = await execAsync("ip -o link show | awk -F': ' '{print $2}'");
+    const allInterfaces = stdout.trim().split('\n').map(i => i.trim()).filter(i => i);
+
+    // Include patterns for USB modem interfaces
+    // enx*: HiLink USB ethernet (most common for K5160)
+    // wwan*: cellular modem interfaces
+    // usb*: generic USB network
+    // eth1, eth2...: secondary ethernet (often USB modems)
+    const includePatterns = ['enx', 'wwan', 'usb', 'ppp'];
+    const excluded = ['lo', 'wlan', 'eth0', 'docker', 'br-', 'veth', 'virbr'];
+
+    const patternMatched = allInterfaces.filter(iface => {
+      // Skip excluded
       for (const ex of excluded) {
         if (iface.startsWith(ex)) return false;
       }
-      return true;
+      // Include if matches known USB modem patterns
+      for (const pat of includePatterns) {
+        if (iface.startsWith(pat)) return true;
+      }
+      // Include secondary eth interfaces (eth1, eth2, etc.)
+      if (/^eth[1-9]/.test(iface)) return true;
+      return false;
     });
+
+    // Merge both methods (unique)
+    const merged = [...new Set([...usbInterfaces, ...patternMatched])];
+    
+    // Final filter: remove primary built-in interfaces
+    const result = merged.filter(i => !['lo', 'eth0', 'wlan0'].includes(i));
+    
+    console.log(`[dcom-scanner] Found interfaces: ${result.length > 0 ? result.join(', ') : 'none'}`);
+    console.log(`[dcom-scanner] All interfaces: ${allInterfaces.join(', ')}`);
+    
+    return result;
   } catch (error) {
     console.error('Error listing interfaces:', error.message);
     return [];
