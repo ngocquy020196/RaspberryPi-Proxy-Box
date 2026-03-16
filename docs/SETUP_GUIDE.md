@@ -8,14 +8,7 @@ Complete guide to install and configure the Raspberry Pi 4G Proxy Box system.
 - **Raspberry Pi** 3B+/4/5 with Raspberry Pi OS
 - **5V/3A Power Supply** (minimum)
 - **Powered USB Hub** — required for multiple Dcoms
-- **USB 4G Dcom** — Vodafone K5160 / Huawei E3372
-
-The installer automatically installs:
-- Node.js 18 LTS
-- 3proxy (compiled from source)
-- cloudflared (Cloudflare Tunnel client)
-- usb-modeswitch, ppp, wvdial
-- socat (for IMEI/Device ID detection via AT commands)
+- **USB 4G Dcom** — Vodafone K5160 / Huawei E3372 / E1550
 
 ### Wiring
 ```
@@ -38,12 +31,11 @@ cd /opt/dcom-proxy
 sudo bash setup.sh
 ```
 
-The installer will:
-1. Install Node.js 18, 3proxy, cloudflared, usb-modeswitch, ppp
-2. Generate `.env` with random password
-3. Configure systemd services (auto-start on boot)
-4. **Ask for Cloudflare DDNS credentials** (API Token, Zone ID, Domain)
-5. **Ask for Cloudflare Tunnel** (remote dashboard access)
+The installer automatically installs:
+- Node.js 18 LTS
+- 3proxy (compiled from source)
+- cloudflared (Cloudflare Tunnel client)
+- usb-modeswitch, ppp, wvdial
 
 ---
 
@@ -55,15 +47,15 @@ nano /opt/dcom-proxy/.env
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SECRET_KEY` | Dashboard login password | Auto-generated |
+| `SECRET_KEY` | Dashboard login + API key | Auto-generated |
 | `PORT` | Web dashboard port | `8080` |
 | `PROXY_START_PORT` | Starting port for proxies | `10000` |
 | `IP_ROTATE_METHOD` | `hilink` / `interface` / `at_command` | `hilink` |
 | `DEFAULT_PROXY_USER` | Proxy username | `proxyuser` |
 | `DEFAULT_PROXY_PASS` | Proxy password | `proxypass` |
-| `CF_API_TOKEN` | Cloudflare API token | Required |
-| `CF_ZONE_ID` | Cloudflare Zone ID | Required |
-| `CF_DDNS_DOMAIN` | DDNS domain for proxy access | Required |
+| `CF_API_TOKEN` | Cloudflare API token | **Required** |
+| `CF_ZONE_ID` | Cloudflare Zone ID | **Required** |
+| `CF_DDNS_DOMAIN` | DDNS domain for proxy access | **Required** |
 
 ---
 
@@ -78,8 +70,8 @@ Forward port range `10000:10020` → Pi's local IP (e.g., `192.168.50.22`)
 ```
 Internet → Router Main → Router Secondary → Pi
 ```
-1. **Router Secondary:** Forward `10000:10020` → Pi IP
-2. **Router Main:** Forward `10000:10020` → Router Secondary WAN IP
+1. **Router Secondary:** Forward `10000:10020` → Pi IP (TCP)
+2. **Router Main:** Forward `10000:10020` → Router Secondary WAN IP (TCP)
 
 ### ASUS RT-AX53U Example
 - WAN → Virtual Server / Port Forwarding
@@ -105,18 +97,15 @@ Auto-updates your domain with Pi's public WiFi IP every 5 minutes.
 
 ### DNS Record Settings
 - Type: `A`
-- Name: your DDNS subdomain
+- Name: your DDNS subdomain (e.g., `ddns-proxy`)
 - Proxy status: **DNS only** (☁️ grey cloud, NOT 🟠 orange)
 
-> ⚠️ Proxy status MUST be "DNS only" for TCP proxy to work. Orange cloud = Cloudflare CDN proxy = blocks TCP.
+> ⚠️ Proxy status MUST be "DNS only" for TCP proxy to work. Orange cloud = Cloudflare CDN proxy = blocks TCP connections.
 
 ### Verify DDNS
 ```bash
-# Check what IP the domain resolves to
-nslookup your-ddns-domain.com
-
-# Should match Pi's public IP
-curl https://api.ipify.org
+nslookup ddns-proxy.yourdomain.com   # Should show Pi's public IP
+curl https://api.ipify.org            # Pi's public IP for comparison
 ```
 
 ---
@@ -125,8 +114,8 @@ curl https://api.ipify.org
 
 Provides HTTPS remote access to the web dashboard.
 
-### Automatic Setup (during installation)
-The installer handles tunnel creation, DNS routing, and service setup.
+### Automatic Setup
+The installer handles tunnel creation, DNS routing, and service setup during `setup.sh`.
 
 ### Manual Setup
 ```bash
@@ -134,7 +123,6 @@ cloudflared tunnel login
 cloudflared tunnel create dcom-proxy
 cloudflared tunnel route dns dcom-proxy dashboard.yourdomain.com
 
-# Create config
 cat > ~/.cloudflared/config.yml << EOF
 tunnel: <TUNNEL_ID>
 credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
@@ -151,13 +139,40 @@ sudo systemctl start cloudflared
 
 ---
 
-## 7. Services
+## 7. External API
+
+### Authentication
+Use `SECRET_KEY` (same as dashboard login password):
+- Query param: `?key=YOUR_KEY`
+- Header: `x-api-key: YOUR_KEY`
+
+### Endpoints (all GET)
+
+| Endpoint | Description |
+|----------|-------------|
+| `/ext/api/devices` | List all devices |
+| `/ext/api/device/:deviceId` | Status & proxy info by Device ID |
+| `/ext/api/rotate/:deviceId` | Rotate IP (resets uptime) |
+
+### Device ID
+Each device gets a unique **8-character MD5 hash** (e.g., `a1b2c3d4`) based on MAC address, IMEI, or USB bus path.
+
+### Examples
+```bash
+curl "https://dashboard.yourdomain.com/ext/api/devices?key=YOUR_KEY"
+curl "https://dashboard.yourdomain.com/ext/api/device/a1b2c3d4?key=YOUR_KEY"
+curl "https://dashboard.yourdomain.com/ext/api/rotate/a1b2c3d4?key=YOUR_KEY"
+```
+
+---
+
+## 8. Services
 
 All services auto-start on boot:
 
 | Service | Command | Purpose |
 |---------|---------|---------|
-| `dcom-proxy` | `systemctl status dcom-proxy` | Dashboard + modem management |
+| `dcom-proxy` | `systemctl status dcom-proxy` | Dashboard + API |
 | `3proxy` | `systemctl status 3proxy` | Proxy server |
 | `ddns-update.timer` | `systemctl status ddns-update.timer` | DDNS every 5 min |
 | `cloudflared` | `systemctl status cloudflared` | Tunnel |
@@ -172,72 +187,50 @@ sudo systemctl restart dcom-proxy 3proxy
 
 ---
 
-## 8. Updating
+## 9. Updating
 
 ```bash
 cd /opt/dcom-proxy && sudo git pull && sudo bash update.sh
 ```
 
-The update script:
-- Stops running services
-- Installs new dependencies
-- Updates systemd files
-- Restarts everything
-- Configures DDNS if not set
-
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
-### Pi Loses Network / Won't Respond to Ping
+### Pi Loses Network / Can't Ping
 - **Power issue:** Use powered USB hub + 5V/3A supply
-- **PPP took default route:** Restart Pi, check routing table
+- **PPP took default route:** Restart Pi
 - **WiFi disconnected:** Check `ip addr show wlan0`
-
-### DNS Resolution Fails After PPP
-```bash
-# Check DNS config
-cat /etc/resolv.conf
-
-# Should contain:
-# nameserver 8.8.8.8
-# nameserver 1.1.1.1
-```
 
 ### USB Dcom Not Detected
 ```bash
 lsusb | grep -i huawei
-# If product ID is 14fe (CD-ROM mode), switch:
+# If in CD-ROM mode (14fe), switch:
 sudo usb_modeswitch -v 0x12d1 -p 0x14fe \
   -M 55534243123456780000000000000a11062000000000000100000000000000
 ```
 
+### DDNS Domain Not Resolving
+1. Check Cloudflare DNS record exists (A record)
+2. Ensure proxy status is **DNS only** (grey cloud ☁️)
+3. Flush local DNS: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`
+4. Verify: `nslookup ddns-proxy.yourdomain.com`
+
 ### Cannot Connect to Proxy from Outside
-1. Check port forwarding on router
-2. Check DDNS domain resolves to correct IP: `nslookup your-domain.com`
-3. Ensure Cloudflare Proxy is OFF (DNS only, grey cloud)
-4. Test locally first: `curl -x http://proxyuser:proxypass@localhost:10000 https://api.ipify.org`
-
-### 3proxy Won't Start
-```bash
-# Check config
-cat /etc/3proxy/3proxy.cfg
-
-# Check logs
-cat /var/log/3proxy/3proxy.log
-
-# Restart
-sudo systemctl restart 3proxy
-```
+1. Check port forwarding on router(s)
+2. Check DDNS domain resolves to correct IP
+3. Test locally first: `curl -x http://proxyuser:proxypass@localhost:10000 https://api.ipify.org`
 
 ### DDNS Not Updating
 ```bash
-# Run manually
-sudo bash /opt/dcom-proxy/scripts/ddns-update.sh
+sudo bash /opt/dcom-proxy/scripts/ddns-update.sh   # Run manually
+sudo systemctl status ddns-update.timer             # Check timer
+sudo journalctl -u ddns-update -n 20                # Check logs
+```
 
-# Check timer
-sudo systemctl status ddns-update.timer
-
-# Check logs
-sudo journalctl -u ddns-update -n 20
+### 3proxy Won't Start
+```bash
+cat /etc/3proxy/3proxy.cfg    # Check config
+cat /var/log/3proxy/3proxy.log # Check logs
+sudo systemctl restart 3proxy  # Restart
 ```

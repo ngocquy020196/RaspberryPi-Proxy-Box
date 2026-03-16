@@ -25,7 +25,7 @@ sudo bash setup.sh
 ```
 
 ✅ The setup script automatically:
-1. Installs Node.js, 3proxy, cloudflared, usb-modeswitch
+1. Installs Node.js, 3proxy, cloudflared, usb-modeswitch, ppp
 2. Generates a random password & starts all services
 3. **Configures Cloudflare DDNS** (auto-update domain with Pi's public IP)
 4. **Configures Cloudflare Tunnel** (remote dashboard access)
@@ -38,12 +38,15 @@ sudo bash setup.sh
 | Feature | Description |
 |---------|-------------|
 | 🌐 **Multi-Proxy** | Each USB Dcom = 1 dedicated proxy (HTTP + SOCKS5) |
-| 🔄 **IP Rotation** | Change 4G IP with 1 click (HiLink API / AT Commands) |
-| 🖥️ **Web Dashboard** | Clean light theme UI with real-time device monitoring |
+| 🔄 **IP Rotation** | Change 4G IP with 1 click — resets uptime |
+| 🖥️ **Web Dashboard** | Clean light theme, real-time monitoring, favicon 🚀 |
 | 🔒 **Security** | Secret key login, per-device proxy authentication |
 | 🌍 **Remote Access** | Cloudflare Tunnel (dashboard) + DDNS + Port Forward (proxy) |
 | 📡 **DDNS** | Auto-update domain with Pi's public IP every 5 minutes |
-| 📋 **Quick Connect** | Copy proxy string with 1 click, curl commands ready |
+| 📋 **Quick Connect** | Copy curl commands & proxy strings with 1 click |
+| 🔑 **External API** | GET endpoints with API key — list, status, rotate by Device ID |
+| ⏱️ **Uptime** | Per-device uptime tracking, resets on IP rotate |
+| 🆔 **Device ID** | Unique MD5 hash (8 chars) per device for API access |
 | 🔌 **Plug & Play** | Plug in Dcom → auto-detect, auto-switch mode, auto-connect |
 | ⚙️ **Auto-start** | All services start on boot (systemd) |
 
@@ -54,7 +57,7 @@ sudo bash setup.sh
 - **Raspberry Pi** (3B+/4/5) — running Raspberry Pi OS / Debian
 - **Powered USB Hub** — required for multiple Dcoms (Pi USB ports can't supply enough power)
 - **Power Supply** — 5V/3A minimum for Pi
-- **USB 4G Dcom**: Vodafone K5160 / Huawei E3372 (HiLink or Stick mode)
+- **USB 4G Dcom**: Vodafone K5160 / Huawei E3372 / E1550 (HiLink or Stick mode)
 
 > ⚠️ **Important:** Always use a powered USB hub. Plugging multiple Dcoms directly into Pi causes power issues and crashes.
 
@@ -90,9 +93,11 @@ curl --socks5 proxyuser:proxypass@<DDNS_DOMAIN>:11000 https://api.ipify.org
 
 ### 4. Dashboard Features
 
-- **Public IP / Local IP** — view both IPs for each Dcom
-- **Quick Connect** — copy-paste curl commands with DDNS domain
-- **Copy Button** — copies proxy string with DDNS domain
+- **Device ID** — unique 8-char hash per USB device
+- **Public IP / Local IP** — both IPs for each Dcom
+- **Uptime** — how long each device has been connected (resets on rotate)
+- **Quick Connect** — curl & proxy string with individual Copy buttons
+- **External API** — full API URLs with key, each with Copy button
 - **Stop / Start** — control individual Dcom connections
 - **IP Rotation** — rotate 4G IP with 1 click
 - **Auto-refresh** — dashboard updates every 15 seconds
@@ -107,19 +112,19 @@ Configured automatically during `setup.sh`. Provides HTTPS access to dashboard f
 
 ### Cloudflare DDNS (Proxy Ports)
 
-Configured automatically during `setup.sh`. Requires:
+Configured automatically during `setup.sh`. All fields are **required**:
 - **Cloudflare API Token** (Edit zone DNS permission)
 - **Zone ID** (from Cloudflare dashboard)
-- **DDNS Domain** (e.g., `proxy.yourdomain.com`)
+- **DDNS Domain** (e.g., `ddns-proxy.yourdomain.com`)
 
-The DDNS timer runs every 5 minutes, updating the A record with Pi's public WiFi IP.
+> ⚠️ DDNS domain must be set to **DNS only** (grey cloud ☁️) in Cloudflare, NOT proxied (orange 🟠).
 
 ### Port Forwarding (Router)
 
 Required for proxy access from outside your network:
 
 1. Forward port range **`10000:10020`** → `<PI_LOCAL_IP>` (TCP) on your router
-2. If using a secondary router, forward on both routers
+2. If using a secondary router, forward on both routers (main → secondary → Pi)
 
 > **Tip:** Set a static IP for your Pi in the router's DHCP settings.
 
@@ -127,34 +132,35 @@ Required for proxy access from outside your network:
 
 ## 🔑 External API
 
-Authenticated with `SECRET_KEY` (same as dashboard login password). Pass via header or query param.
+Authenticated with `SECRET_KEY` (same as dashboard login password). Pass via `?key=` query param or `x-api-key` header. All endpoints use **GET**.
 
 ### Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/ext/api/devices?key=API_KEY` | List all devices |
-| GET | `/ext/api/device/:deviceID?key=API_KEY` | Get device status & proxy info by Device ID |
-| GET | `/ext/api/rotate/:deviceID?key=API_KEY` | Rotate IP by Device ID |
+| Endpoint | Description |
+|----------|-------------|
+| `/ext/api/devices?key=KEY` | List all devices with IP, status, Device ID |
+| `/ext/api/device/:deviceId?key=KEY` | Get device status, proxy info by Device ID |
+| `/ext/api/rotate/:deviceId?key=KEY` | Rotate IP by Device ID (resets uptime) |
 
 ### Device ID
 
-Each device gets a unique identifier:
-- **HiLink modems**: MAC address (e.g., `aa:bb:cc:dd:ee:ff`)
-- **Stick modems**: IMEI via AT command (e.g., `IMEI:860000000000000`)
-- **Fallback**: USB serial number or bus path
+Each device gets a unique **8-character MD5 hash** based on:
+- HiLink modems → hash of MAC address
+- Stick modems → hash of USB serial / IMEI / bus path
+
+Example Device ID: `a1b2c3d4`
 
 ### Examples
 
 ```bash
 # List all devices
-curl -H "x-api-key: YOUR_KEY" https://proxy.yourdomain.com/ext/api/devices
+curl "https://proxy.yourdomain.com/ext/api/devices?key=YOUR_KEY"
 
 # Get device by ID
-curl "https://proxy.yourdomain.com/ext/api/device/IMEI:860000000000000?key=YOUR_KEY"
+curl "https://proxy.yourdomain.com/ext/api/device/a1b2c3d4?key=YOUR_KEY"
 
 # Rotate IP
-curl "https://proxy.yourdomain.com/ext/api/rotate/IMEI:860000000000000?key=YOUR_KEY"
+curl "https://proxy.yourdomain.com/ext/api/rotate/a1b2c3d4?key=YOUR_KEY"
 ```
 
 ### Response Example
@@ -163,13 +169,14 @@ curl "https://proxy.yourdomain.com/ext/api/rotate/IMEI:860000000000000?key=YOUR_
 {
   "success": true,
   "device": {
-    "mac": "IMEI:860000000000000",
+    "deviceId": "a1b2c3d4",
     "interface": "ppp0",
     "publicIP": "113.185.72.162",
     "localIP": "10.173.0.1",
     "status": "active",
+    "type": "stick",
     "proxy": {
-      "host": "proxy-ddns.yourdomain.com",
+      "host": "ddns-proxy.yourdomain.com",
       "port": 10000,
       "username": "proxyuser",
       "password": "proxypass"
@@ -185,18 +192,18 @@ curl "https://proxy.yourdomain.com/ext/api/rotate/IMEI:860000000000000?key=YOUR_
 ```
 ├── setup.sh              # One-command installer
 ├── update.sh             # Update script
-├── server.js             # Express API server
+├── server.js             # Express API server + uptime tracking + ext API
 ├── src/
 │   ├── auth.js           # Session authentication
-│   ├── dcom-scanner.js   # USB Dcom detection + public IP lookup
+│   ├── dcom-scanner.js   # USB detection, Device ID (MD5), public IP
 │   ├── proxy-manager.js  # 3proxy config generator
 │   └── ip-rotator.js     # IP rotation (3 methods)
 ├── scripts/
 │   └── ddns-update.sh    # Cloudflare DDNS updater
-├── public/               # Dashboard UI
+├── public/               # Dashboard UI (light theme, favicon 🚀)
 │   ├── index.html        # Login page
 │   ├── dashboard.html    # Main dashboard
-│   ├── css/style.css     # Light theme
+│   ├── css/style.css     # Light theme styles
 │   └── js/               # Frontend logic
 ├── config/               # 3proxy template
 ├── docs/                 # Setup guide
@@ -211,15 +218,15 @@ The `.env` file is auto-generated during setup:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SECRET_KEY` | Dashboard login password | Auto-generated |
+| `SECRET_KEY` | Dashboard login + API key | Auto-generated |
 | `PORT` | Web dashboard port | `8080` |
 | `PROXY_START_PORT` | Starting port for proxies | `10000` |
 | `IP_ROTATE_METHOD` | IP rotation method | `hilink` |
 | `DEFAULT_PROXY_USER` | Default proxy username | `proxyuser` |
 | `DEFAULT_PROXY_PASS` | Default proxy password | `proxypass` |
-| `CF_API_TOKEN` | Cloudflare API token (DDNS) | Required |
-| `CF_ZONE_ID` | Cloudflare Zone ID (DDNS) | Required |
-| `CF_DDNS_DOMAIN` | DDNS domain for proxy | Required |
+| `CF_API_TOKEN` | Cloudflare API token (DDNS) | **Required** |
+| `CF_ZONE_ID` | Cloudflare Zone ID (DDNS) | **Required** |
+| `CF_DDNS_DOMAIN` | DDNS domain for proxy | **Required** |
 
 ---
 
@@ -239,7 +246,7 @@ sudo journalctl -u dcom-proxy -f
 sudo systemctl restart dcom-proxy
 sudo systemctl restart 3proxy
 
-# Change dashboard password
+# Change dashboard password (also changes API key)
 nano /opt/dcom-proxy/.env    # Edit SECRET_KEY
 sudo systemctl restart dcom-proxy
 ```
@@ -250,7 +257,7 @@ All services are enabled by default and start on boot:
 
 | Service | Purpose |
 |---------|---------|
-| `dcom-proxy` | Dashboard + modem management |
+| `dcom-proxy` | Dashboard + modem management + API |
 | `3proxy` | Proxy server |
 | `ddns-update.timer` | DDNS update every 5 min |
 | `cloudflared` | Cloudflare Tunnel |
