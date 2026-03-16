@@ -381,6 +381,34 @@ logfile /var/log/ppp-${peerName}.log
       const ipInfo = await getInterfaceIP(pppIface);
       if (ipInfo.ip) {
         console.log(`[dcom-scanner] PPP connected: ${pppIface} → ${ipInfo.ip}`);
+
+        // Setup policy-based routing:
+        // Traffic FROM ppp IP → route through ppp0
+        // All other traffic → stays on WiFi (default route)
+        const tableId = 100 + pppIndex;
+        try {
+          // Get peer gateway IP
+          const { stdout: routeInfo } = await execAsync(`ip route show dev ${pppIface} 2>/dev/null`).catch(() => ({ stdout: '' }));
+          const peerMatch = routeInfo.match(/(\d+\.\d+\.\d+\.\d+)/);
+          const peerIp = peerMatch ? peerMatch[1] : null;
+
+          // Remove old rules for this table
+          await execAsync(`ip rule del table ${tableId} 2>/dev/null`).catch(() => {});
+          await execAsync(`ip route flush table ${tableId} 2>/dev/null`).catch(() => {});
+
+          // Add routing: traffic from ppp IP → goes through ppp0
+          if (peerIp) {
+            await execAsync(`ip route add default via ${peerIp} dev ${pppIface} table ${tableId}`);
+          } else {
+            await execAsync(`ip route add default dev ${pppIface} table ${tableId}`);
+          }
+          await execAsync(`ip rule add from ${ipInfo.ip} table ${tableId} priority ${tableId}`);
+
+          console.log(`[dcom-scanner] Policy routing set: ${ipInfo.ip} → table ${tableId} via ${pppIface}`);
+        } catch (routeErr) {
+          console.error(`[dcom-scanner] Route setup warning:`, routeErr.message);
+        }
+
         return { success: true, interface: pppIface, ip: ipInfo.ip };
       }
       retries--;

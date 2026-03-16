@@ -169,6 +169,27 @@ async function rotatePPP(interfaceName) {
           console.log(`[ip-rotator] PPP reconnected with same IP: ${newIP}`);
         }
 
+        // Re-setup policy-based routing for new IP
+        const tableId = 100 + pppIndex;
+        try {
+          const { stdout: routeInfo } = await execAsync(`ip route show dev ${interfaceName} 2>/dev/null`).catch(() => ({ stdout: '' }));
+          const peerMatch = routeInfo.match(/(\d+\.\d+\.\d+\.\d+)/);
+          const peerIp = peerMatch ? peerMatch[1] : null;
+
+          await execAsync(`ip rule del table ${tableId} 2>/dev/null`).catch(() => {});
+          await execAsync(`ip route flush table ${tableId} 2>/dev/null`).catch(() => {});
+
+          if (peerIp) {
+            await execAsync(`ip route add default via ${peerIp} dev ${interfaceName} table ${tableId}`);
+          } else {
+            await execAsync(`ip route add default dev ${interfaceName} table ${tableId}`);
+          }
+          await execAsync(`ip rule add from ${newIP} table ${tableId} priority ${tableId}`);
+          console.log(`[ip-rotator] Policy routing updated: ${newIP} → table ${tableId}`);
+        } catch (routeErr) {
+          console.error('[ip-rotator] Route setup warning:', routeErr.message);
+        }
+
         // Update 3proxy config with new IP
         try {
           const proxyManager = require('./proxy-manager');
