@@ -195,4 +195,45 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 DCOM Proxy Box running at http://0.0.0.0:${PORT}`);
   console.log(`📡 Dashboard: http://localhost:${PORT}`);
   console.log(`🔑 Login with your SECRET_KEY from .env\n`);
+
+  // Auto-connect stick modems on startup (after 5s delay)
+  setTimeout(autoConnectModems, 5000);
+
+  // Periodically check for new modems and auto-connect (every 30s)
+  setInterval(autoConnectModems, 30000);
 });
+
+/**
+ * Auto-connect disconnected stick modems
+ * Runs on startup and every 30 seconds
+ */
+async function autoConnectModems() {
+  try {
+    const devices = await dcomScanner.scanDevices();
+    let connected = 0;
+
+    for (let i = 0; i < devices.length; i++) {
+      const device = devices[i];
+      if (device.type === 'stick' && device.status === 'disconnected' && device.serialPort) {
+        console.log(`[auto-connect] Connecting ${device.serialPort} as ppp${i}...`);
+        const result = await dcomScanner.connectStickModem(device.serialPort, i);
+        if (result.success) {
+          console.log(`[auto-connect] ✓ Connected ppp${i} → ${result.ip}`);
+          connected++;
+        } else {
+          console.log(`[auto-connect] ✗ Failed ppp${i}: ${result.message || result.error}`);
+        }
+      }
+    }
+
+    // If any new connections, auto-apply 3proxy config
+    if (connected > 0) {
+      console.log(`[auto-connect] ${connected} modem(s) connected — applying 3proxy config...`);
+      const updatedDevices = await dcomScanner.scanDevices();
+      await proxyManager.regenerateAndReload(updatedDevices);
+    }
+  } catch (error) {
+    console.error('[auto-connect] Error:', error.message);
+  }
+}
+
