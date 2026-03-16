@@ -325,22 +325,36 @@
 
   function copyProxy(btn) {
     const proxyStr = btn.dataset.proxy;
-    navigator.clipboard.writeText(proxyStr).then(() => {
+    
+    function onSuccess() {
       showToast(`Copied: ${proxyStr}`, 'success');
-      // Visual feedback
       const originalHTML = btn.innerHTML;
       btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
       setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
-    }).catch(() => {
-      // Fallback for non-HTTPS
-      const input = document.createElement('input');
-      input.value = proxyStr;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-      showToast(`Copied: ${proxyStr}`, 'success');
-    });
+    }
+
+    // Try textarea fallback first (works on HTTP)
+    const textarea = document.createElement('textarea');
+    textarea.value = proxyStr;
+    textarea.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    
+    try {
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (ok) { onSuccess(); return; }
+    } catch { document.body.removeChild(textarea); }
+
+    // Fallback: clipboard API (only works on HTTPS/localhost)
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(proxyStr).then(onSuccess).catch(() => {
+        showToast(`Proxy: ${proxyStr}`, 'info');
+      });
+    } else {
+      showToast(`Proxy: ${proxyStr}`, 'info');
+    }
   }
 
   async function connectPPP(index, serialPort) {
