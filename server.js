@@ -208,6 +208,101 @@ app.post('/api/rotate-all', async (req, res) => {
   }
 });
 
+// ============================================
+// External API — authenticated with SECRET_KEY
+// For external tools, scripts, customers
+// ============================================
+
+// Middleware: check SECRET_KEY via header or query param
+function requireApiKey(req, res, next) {
+  const key = req.headers['x-api-key'] || req.query.key;
+  if (!key || key !== process.env.SECRET_KEY) {
+    return res.status(401).json({ success: false, error: 'Invalid API key' });
+  }
+  next();
+}
+
+// GET /ext/api/devices — list all devices
+app.get('/ext/api/devices', requireApiKey, async (req, res) => {
+  try {
+    const devices = await dcomScanner.scanDevices();
+    res.json({
+      success: true,
+      devices: devices.map(d => ({
+        mac: d.macAddress,
+        interface: d.interfaceName,
+        publicIP: d.ip,
+        localIP: d.localIP || d.ip,
+        status: d.status,
+        type: d.type,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /ext/api/device/:mac — get device status & IP by MAC
+app.get('/ext/api/device/:mac', requireApiKey, async (req, res) => {
+  try {
+    const mac = decodeURIComponent(req.params.mac);
+    const devices = await dcomScanner.scanDevices();
+    const device = devices.find(d => d.macAddress === mac);
+
+    if (!device) {
+      return res.status(404).json({ success: false, error: 'Device not found' });
+    }
+
+    const config = proxyManager.loadDeviceConfigs()[device.interfaceName] || {};
+    res.json({
+      success: true,
+      device: {
+        mac: device.macAddress,
+        interface: device.interfaceName,
+        publicIP: device.ip,
+        localIP: device.localIP || device.ip,
+        status: device.status,
+        type: device.type,
+        proxy: {
+          host: process.env.CF_DDNS_DOMAIN || '',
+          port: config.port || 10000,
+          username: config.username || process.env.DEFAULT_PROXY_USER || 'proxyuser',
+          password: config.password || process.env.DEFAULT_PROXY_PASS || 'proxypass',
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /ext/api/rotate/:mac — rotate IP by MAC
+app.post('/ext/api/rotate/:mac', requireApiKey, async (req, res) => {
+  try {
+    const mac = decodeURIComponent(req.params.mac);
+    const devices = await dcomScanner.scanDevices();
+    const device = devices.find(d => d.macAddress === mac);
+
+    if (!device) {
+      return res.status(404).json({ success: false, error: 'Device not found' });
+    }
+
+    if (device.status !== 'active') {
+      return res.status(400).json({ success: false, error: 'Device not active' });
+    }
+
+    let method = req.body?.method || process.env.IP_ROTATE_METHOD || 'hilink';
+    if (device.interfaceName.startsWith('ppp')) {
+      method = 'interface';
+    }
+
+    const result = await ipRotator.rotateIP(device.interfaceName, method);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ---- SPA Fallback ----
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

@@ -34,6 +34,39 @@ const HUAWEI_MODEM_PRODUCTS = {
 };
 
 /**
+ * Get MAC address for a network interface
+ * PPP interfaces don't have MAC, so we use USB bus ID as stable identifier
+ */
+async function getMACAddress(interfaceName) {
+  try {
+    // Try to get real MAC address (works for eth/usb interfaces)
+    const { stdout } = await execAsync(`cat /sys/class/net/${interfaceName}/address 2>/dev/null`);
+    const mac = stdout.trim();
+    if (mac && mac !== '00:00:00:00:00:00') return mac;
+  } catch {}
+
+  // For PPP interfaces, get USB device serial as stable ID
+  try {
+    const { stdout } = await execAsync(
+      `ls /sys/class/net/${interfaceName}/device/../../serial 2>/dev/null && cat /sys/class/net/${interfaceName}/device/../../serial 2>/dev/null || echo ""`
+    );
+    const serial = stdout.trim();
+    if (serial) return `USB:${serial}`;
+  } catch {}
+
+  // Fallback: use USB bus path
+  try {
+    const { stdout } = await execAsync(
+      `readlink -f /sys/class/net/${interfaceName} 2>/dev/null | grep -oP 'usb\\d+/[\\d.-]+' | head -1`
+    );
+    const busPath = stdout.trim();
+    if (busPath) return `BUS:${busPath}`;
+  } catch {}
+
+  return 'N/A';
+}
+
+/**
  * Scan for connected USB Dcom devices
  * Returns array of device objects with interface & IP info
  */
@@ -46,12 +79,14 @@ async function scanDevices() {
   for (const iface of networkInterfaces) {
     const ipInfo = await getInterfaceIP(iface);
     const gatewayIP = await getGatewayIP(iface);
+    const mac = await getMACAddress(iface);
 
     devices.push({
       interfaceName: iface,
       ip: ipInfo.ip || 'N/A',
       subnet: ipInfo.subnet || 'N/A',
       gateway: gatewayIP || 'N/A',
+      macAddress: mac,
       status: ipInfo.ip ? 'active' : 'no-ip',
       type: 'hilink',
     });
@@ -73,15 +108,16 @@ async function scanDevices() {
       const modemInfo = stickModems[i] || stickModems[0];
 
       if (pppIface) {
-        // PPP connection active
         const ipInfo = await getInterfaceIP(pppIface);
         const publicIP = ipInfo.ip ? await getPublicIP(pppIface) : null;
+        const mac = await getMACAddress(pppIface);
         devices.push({
           interfaceName: pppIface,
           ip: publicIP || ipInfo.ip || 'N/A',
           localIP: ipInfo.ip || 'N/A',
           subnet: ipInfo.subnet || 'N/A',
           gateway: 'peer',
+          macAddress: mac,
           status: ipInfo.ip ? 'active' : 'no-ip',
           type: 'stick',
           serialPort: group.modemPort,
@@ -89,12 +125,12 @@ async function scanDevices() {
           usbInfo: modemInfo,
         });
       } else {
-        // PPP not connected — needs dial
         devices.push({
           interfaceName: `ppp${i}`,
           ip: 'N/A',
           subnet: 'N/A',
           gateway: 'N/A',
+          macAddress: 'N/A',
           status: 'disconnected',
           type: 'stick',
           serialPort: group.modemPort,
@@ -114,6 +150,7 @@ async function scanDevices() {
         ip: 'N/A',
         subnet: 'N/A',
         gateway: 'N/A',
+        macAddress: 'N/A',
         status: 'storage-mode',
         type: 'usb-storage',
         usbInfo: usb,

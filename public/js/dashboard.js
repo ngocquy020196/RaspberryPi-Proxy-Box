@@ -172,7 +172,7 @@
     if (devices.length === 0) {
       elements.deviceTableBody.innerHTML = `
         <tr>
-          <td colspan="8" class="empty-state">
+            <td colspan="9" class="empty-state">
             <div class="empty-content">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
               <p>No devices detected. Plug in a USB Dcom.</p>
@@ -198,6 +198,7 @@
         <tr data-interface="${device.interfaceName}">
           <td>${index + 1}</td>
           <td><strong>${device.interfaceName}</strong><br><small class="text-muted">${device.type || ''}</small></td>
+          <td class="ip-cell"><small>${device.macAddress || 'N/A'}</small></td>
           <td class="ip-cell">${device.ip}</td>
           <td class="ip-cell">${device.localIP || device.ip}</td>
           <td class="port-cell">${port}</td>

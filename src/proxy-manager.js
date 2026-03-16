@@ -186,4 +186,5 @@ module.exports = {
   updateDeviceConfig,
   generateConfig,
   regenerateAndReload,
+  loadDeviceConfigs,
 };
