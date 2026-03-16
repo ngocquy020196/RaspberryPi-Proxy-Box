@@ -100,19 +100,23 @@ fi
 # STEP 4: Build & install 3proxy
 # ========================================
 progress "Installing 3proxy"
-if command -v 3proxy &> /dev/null || [ -f /usr/local/bin/3proxy ]; then
-  warn "3proxy already installed"
+if command -v 3proxy &> /dev/null; then
+  warn "3proxy already installed at $(which 3proxy)"
 else
-  cd /tmp
-  rm -rf 3proxy-src
-  git clone --quiet https://github.com/3proxy/3proxy.git 3proxy-src
-  cd 3proxy-src
-  ln -sf Makefile.Linux Makefile
-  make -f Makefile.Linux -j$(nproc) > /dev/null 2>&1
-  make -f Makefile.Linux install > /dev/null 2>&1
-  cd "$INSTALL_DIR"
-  rm -rf /tmp/3proxy-src
-  log "3proxy built and installed"
+  # Try apt install first
+  apt-get install -y -qq 3proxy > /dev/null 2>&1
+  if ! command -v 3proxy &> /dev/null; then
+    # Build from source as fallback
+    cd /tmp
+    rm -rf 3proxy-src
+    git clone --quiet https://github.com/3proxy/3proxy.git 3proxy-src
+    cd 3proxy-src
+    make -f Makefile.Linux -j$(nproc) > /dev/null 2>&1
+    sudo cp bin/3proxy /usr/bin/3proxy
+    cd "$INSTALL_DIR"
+    rm -rf /tmp/3proxy-src
+  fi
+  log "3proxy installed at $(which 3proxy)"
 fi
 
 # Create 3proxy directories
@@ -237,7 +241,8 @@ WantedBy=multi-user.target
 EOF
 
 # 3proxy service
-cat > /etc/systemd/system/3proxy.service << 'EOF'
+PROXY_BIN=$(which 3proxy 2>/dev/null || echo /usr/bin/3proxy)
+cat > /etc/systemd/system/3proxy.service << EOF
 [Unit]
 Description=3proxy — Lightweight Proxy Server
 After=network.target
@@ -245,8 +250,8 @@ After=network.target
 [Service]
 Type=forking
 PIDFile=/run/3proxy.pid
-ExecStart=/usr/local/bin/3proxy /etc/3proxy/3proxy.cfg
-ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=${PROXY_BIN} /etc/3proxy/3proxy.cfg
+ExecReload=/bin/kill -HUP \$MAINPID
 Restart=on-failure
 RestartSec=3
 

@@ -51,8 +51,9 @@ if [ -f "$INSTALL_DIR/systemd/dcom-proxy.service" ]; then
   cp "$INSTALL_DIR/systemd/dcom-proxy.service" /etc/systemd/system/dcom-proxy.service
 fi
 
-# Create/update 3proxy service
-cat > /etc/systemd/system/3proxy.service << 'EOF'
+# Create/update 3proxy service (auto-detect binary path)
+PROXY_BIN=$(which 3proxy 2>/dev/null || echo /usr/bin/3proxy)
+cat > /etc/systemd/system/3proxy.service << EOF
 [Unit]
 Description=3proxy — Lightweight Proxy Server
 After=network.target
@@ -60,8 +61,8 @@ After=network.target
 [Service]
 Type=forking
 PIDFile=/run/3proxy.pid
-ExecStart=/usr/local/bin/3proxy /etc/3proxy/3proxy.cfg
-ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=${PROXY_BIN} /etc/3proxy/3proxy.cfg
+ExecReload=/bin/kill -HUP \$MAINPID
 Restart=on-failure
 RestartSec=3
 
