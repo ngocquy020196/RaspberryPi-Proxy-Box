@@ -14,7 +14,7 @@ Turn your Raspberry Pi into a professional 4G Proxy Station using multiple USB D
 SSH into your Raspberry Pi and run:
 
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/ngocquy020196/RaspberryPi-Proxy-Box/main/setup.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/ngocquy020196/RaspberryPi-Proxy-Box/refs/heads/main/setup.sh)"
 ```
 
 Or install step by step:
