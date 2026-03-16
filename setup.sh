@@ -268,32 +268,7 @@ log "All services started"
 
 
 # ========================================
-# STEP 10: Tailscale VPN (Remote Proxy Access)
-# ========================================
-progress "Installing Tailscale"
-
-if command -v tailscale &> /dev/null; then
-  TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "not connected")
-  warn "Tailscale already installed (IP: $TAILSCALE_IP)"
-else
-  curl -fsSL https://tailscale.com/install.sh | sh
-  systemctl enable tailscaled > /dev/null 2>&1
-  systemctl start tailscaled > /dev/null 2>&1
-  log "Tailscale installed"
-fi
-
-# Auto-connect Tailscale (shows login URL if first time)
-info "Connecting Tailscale..."
-sudo tailscale up --accept-routes 2>&1 || true
-TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
-if [ -n "$TAILSCALE_IP" ]; then
-  log "Tailscale connected: $TAILSCALE_IP"
-else
-  warn "Tailscale needs login — run 'sudo tailscale up' and open the URL"
-fi
-
-# ========================================
-# STEP 11: Cloudflare Tunnel (Interactive)
+# STEP 10: Cloudflare Tunnel (Interactive)
 # ========================================
 progress "Cloudflare Tunnel Setup"
 
