@@ -85,10 +85,18 @@ log "Service files updated"
 systemctl enable dcom-proxy > /dev/null 2>&1
 systemctl enable 3proxy > /dev/null 2>&1
 
-# 6. Restart main service (auto-connects modems + applies 3proxy config)
-info "Restarting dcom-proxy..."
-systemctl restart dcom-proxy
-log "dcom-proxy restarted"
+# 6. Kill old processes
+info "Stopping old connections..."
+killall pppd 2>/dev/null || true
+systemctl stop 3proxy 2>/dev/null || true
+systemctl stop dcom-proxy 2>/dev/null || true
+sleep 2
+log "Old processes stopped"
+
+# 7. Restart main service (auto-connects modems + applies 3proxy config)
+info "Starting dcom-proxy..."
+systemctl start dcom-proxy
+log "dcom-proxy started"
 
 # Wait for auto-connect
 info "Waiting for modem auto-connect (10s)..."

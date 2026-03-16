@@ -11,30 +11,30 @@
 }
 
 :root {
-  /* Colors */
-  --bg-primary: #0a0e17;
-  --bg-secondary: #111827;
-  --bg-card: rgba(17, 24, 39, 0.8);
-  --bg-card-hover: rgba(31, 41, 55, 0.9);
-  --bg-glass: rgba(255, 255, 255, 0.03);
-  --border-color: rgba(255, 255, 255, 0.06);
-  --border-active: rgba(255, 255, 255, 0.12);
+  /* Colors — Bright Dark Theme */
+  --bg-primary: #0f1420;
+  --bg-secondary: #161d2e;
+  --bg-card: rgba(22, 29, 46, 0.9);
+  --bg-card-hover: rgba(35, 48, 75, 0.9);
+  --bg-glass: rgba(255, 255, 255, 0.05);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(255, 255, 255, 0.16);
   
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #f8fafc;
+  --text-secondary: #a1b0cc;
+  --text-muted: #7689a8;
   
-  --accent-cyan: #22d3ee;
-  --accent-cyan-dim: rgba(34, 211, 238, 0.15);
-  --accent-green: #34d399;
-  --accent-green-dim: rgba(52, 211, 153, 0.15);
-  --accent-purple: #a78bfa;
-  --accent-purple-dim: rgba(167, 139, 250, 0.15);
-  --accent-orange: #fb923c;
-  --accent-orange-dim: rgba(251, 146, 60, 0.15);
-  --accent-red: #f87171;
-  --accent-red-dim: rgba(248, 113, 113, 0.15);
-  --accent-blue: #60a5fa;
+  --accent-cyan: #38e8ff;
+  --accent-cyan-dim: rgba(56, 232, 255, 0.15);
+  --accent-green: #4ade80;
+  --accent-green-dim: rgba(74, 222, 128, 0.15);
+  --accent-purple: #b795ff;
+  --accent-purple-dim: rgba(183, 149, 255, 0.15);
+  --accent-orange: #ffad42;
+  --accent-orange-dim: rgba(255, 173, 66, 0.15);
+  --accent-red: #ff6b6b;
+  --accent-red-dim: rgba(255, 107, 107, 0.15);
+  --accent-blue: #6cb4ff;
 
   /* Spacing */
   --space-xs: 4px;
@@ -469,6 +469,28 @@ select {
 .logout-btn:hover {
   color: var(--accent-red) !important;
   background: var(--accent-red-dim) !important;
+}
+
+.sidebar-copyright {
+  text-align: center;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.sidebar-copyright a,
+.copyright-link {
+  color: var(--accent-cyan);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--transition-fast), text-shadow var(--transition-fast);
+}
+
+.sidebar-copyright a:hover,
+.copyright-link:hover {
+  color: #fff;
+  text-shadow: 0 0 12px var(--accent-cyan);
 }
 
 /* ---- Main Content ---- */
