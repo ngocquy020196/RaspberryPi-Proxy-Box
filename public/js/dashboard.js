@@ -223,14 +223,14 @@
       return `
         <tr data-interface="${device.interfaceName}">
           <td>${index + 1}</td>
-          <td><strong>${device.interfaceName}</strong><br><small class="text-muted">${device.type || ''}</small></td>
-          <td class="ip-cell"><small>${device.deviceId || 'N/A'}</small></td>
-          <td class="ip-cell">${device.ip}</td>
-          <td class="ip-cell">${device.localIP || device.ip}</td>
-          <td class="port-cell">${port}</td>
-          <td class="auth-cell"><span class="proxy-string" title="${proxyString}">${user}:${realPass}</span></td>
-          <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
-          <td><small>${formatUptime(device.uptime)}</small></td>
+          <td data-label="Interface"><strong>${device.interfaceName}</strong><br><small class="text-muted">${device.type || ''}</small></td>
+          <td data-label="Device ID" class="ip-cell"><small>${device.deviceId || 'N/A'}</small></td>
+          <td data-label="Public IP" class="ip-cell">${device.ip}</td>
+          <td data-label="Local IP" class="ip-cell">${device.localIP || device.ip}</td>
+          <td data-label="Port" class="port-cell">${port}</td>
+          <td data-label="Auth" class="auth-cell"><span class="proxy-string" title="${proxyString}">${user}:${realPass}</span></td>
+          <td data-label="Status"><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+          <td data-label="Uptime"><small>${formatUptime(device.uptime)}</small></td>
           <td>
             <div class="action-group">
               ${device.status === 'disconnected' && device.type === 'stick' ? `

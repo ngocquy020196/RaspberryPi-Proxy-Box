@@ -39,7 +39,7 @@ sudo bash setup.sh
 |---------|-------------|
 | 🌐 **Multi-Proxy** | Each USB Dcom = 1 dedicated proxy (HTTP + SOCKS5) |
 | 🔄 **IP Rotation** | Change 4G IP with 1 click — resets uptime |
-| 🖥️ **Web Dashboard** | Clean light theme, real-time monitoring, favicon 🚀 |
+| 🖥️ **Web Dashboard** | Clean light theme, responsive mobile, real-time monitoring 🚀 |
 | 🔒 **Security** | Secret key login, per-device proxy authentication |
 | 🌍 **Remote Access** | Cloudflare Tunnel (dashboard) + DDNS + Port Forward (proxy) |
 | 📡 **DDNS** | Auto-update domain with Pi's public IP every 5 minutes |
