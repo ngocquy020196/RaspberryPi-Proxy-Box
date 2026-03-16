@@ -24,7 +24,9 @@ INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$INSTALL_DIR"
 
 echo ""
-echo -e "${CYAN}━━━ DCOM Proxy Box — Updating... ━━━${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}    DCOM Proxy Box — Auto Update${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
 # 1. Pull latest code
@@ -33,7 +35,7 @@ git fetch --all --quiet
 git reset --hard origin/main --quiet
 log "Code updated"
 
-# 2. Install system dependencies (in case new ones were added)
+# 2. Install system dependencies
 info "Checking system packages..."
 apt-get install -y -qq wvdial ppp usb-modeswitch usbutils > /dev/null 2>&1
 log "System packages OK"
@@ -43,20 +45,65 @@ info "Checking npm dependencies..."
 npm install --production --silent 2>/dev/null
 log "npm dependencies OK"
 
-# 4. Restart services
-info "Restarting services..."
+# 4. Update systemd service files from repo
+info "Updating service files..."
+if [ -f "$INSTALL_DIR/systemd/dcom-proxy.service" ]; then
+  cp "$INSTALL_DIR/systemd/dcom-proxy.service" /etc/systemd/system/dcom-proxy.service
+fi
+
+# Create/update 3proxy service
+cat > /etc/systemd/system/3proxy.service << 'EOF'
+[Unit]
+Description=3proxy — Lightweight Proxy Server
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/run/3proxy.pid
+ExecStart=/usr/local/bin/3proxy /etc/3proxy/3proxy.cfg
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Fix PID path in 3proxy config if exists
+if [ -f /etc/3proxy/3proxy.cfg ]; then
+  sed -i 's|/var/run/3proxy.pid|/run/3proxy.pid|' /etc/3proxy/3proxy.cfg
+fi
+
+# Create log dir
+mkdir -p /var/log/3proxy
+
 systemctl daemon-reload
+log "Service files updated"
+
+# 5. Enable services
+systemctl enable dcom-proxy > /dev/null 2>&1
+systemctl enable 3proxy > /dev/null 2>&1
+
+# 6. Restart main service (auto-connects modems + applies 3proxy config)
+info "Restarting dcom-proxy..."
 systemctl restart dcom-proxy
 log "dcom-proxy restarted"
 
-if systemctl is-active --quiet 3proxy; then
-  systemctl restart 3proxy
-  log "3proxy restarted"
-fi
+# Wait for auto-connect
+info "Waiting for modem auto-connect (10s)..."
+sleep 10
 
+# Check results
 PI_IP=$(hostname -I | awk '{print $1}')
+PPP_UP=$(ip -4 addr show ppp0 2>/dev/null | grep -oP 'inet \K[\d.]+')
+
 echo ""
 echo -e "${GREEN}✅ Update complete!${NC}"
 echo -e "   📡 Dashboard: ${CYAN}http://${PI_IP}:8080${NC}"
-echo -e "   📄 Logs: ${CYAN}sudo journalctl -u dcom-proxy -f${NC}"
+if [ -n "$PPP_UP" ]; then
+  echo -e "   🌐 PPP0 IP:   ${CYAN}${PPP_UP}${NC}"
+  PROXY_STATUS=$(sudo systemctl is-active 3proxy 2>/dev/null)
+  echo -e "   🔌 3proxy:    ${CYAN}${PROXY_STATUS}${NC}"
+fi
+echo -e "   📄 Logs:      ${CYAN}sudo journalctl -u dcom-proxy -f${NC}"
 echo ""
