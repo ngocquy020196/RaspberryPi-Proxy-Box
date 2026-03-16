@@ -72,7 +72,8 @@ function generateConfig(devices) {
   let activeCount = 0;
 
   devices.forEach((device, index) => {
-    if (device.status !== 'active' || !device.ip || device.ip === 'N/A') return;
+    const bindIP = device.localIP || device.ip;
+    if (device.status !== 'active' || !bindIP || bindIP === 'N/A') return;
 
     activeCount++;
     const iface = device.interfaceName;
@@ -89,8 +90,8 @@ function generateConfig(devices) {
     proxyEntries.push(`auth strong`);
     proxyEntries.push(`allow ${username}`);
 
-    // Set outgoing interface
-    proxyEntries.push(`external ${device.ip}`);
+    // Set outgoing interface (use local/private IP for binding)
+    proxyEntries.push(`external ${bindIP}`);
 
     // Add proxy listener(s)
     if (proxyType === 'http' || proxyType === 'both') {

@@ -8,6 +8,8 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 
 // Huawei USB Vendor ID
 const HUAWEI_VENDOR_ID = '12d1';
@@ -73,9 +75,11 @@ async function scanDevices() {
       if (pppIface) {
         // PPP connection active
         const ipInfo = await getInterfaceIP(pppIface);
+        const publicIP = ipInfo.ip ? await getPublicIP(pppIface) : null;
         devices.push({
           interfaceName: pppIface,
-          ip: ipInfo.ip || 'N/A',
+          ip: publicIP || ipInfo.ip || 'N/A',
+          localIP: ipInfo.ip || 'N/A',
           subnet: ipInfo.subnet || 'N/A',
           gateway: 'peer',
           status: ipInfo.ip ? 'active' : 'no-ip',
@@ -436,11 +440,31 @@ async function disconnectPPP(pppIndex = 0) {
   }
 }
 
+/**
+ * Get public IP for a specific interface (e.g. ppp0)
+ * Uses curl through the interface to check actual public IP
+ */
+async function getPublicIP(interfaceName) {
+  try {
+    const { stdout } = await execAsync(
+      `curl -s --interface ${interfaceName} --max-time 5 https://api.ipify.org 2>/dev/null`
+    );
+    const ip = stdout.trim();
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
+      return ip;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   scanDevices,
   detectUSBModems,
   getModemInterfaces,
   getInterfaceIP,
+  getPublicIP,
   getSystemInfo,
   switchModemMode,
   connectStickModem,
