@@ -80,7 +80,7 @@ apt-get install -y -qq \
   curl wget git build-essential \
   net-tools iproute2 usbutils \
   usb-modeswitch usb-modeswitch-data \
-  sg3-utils ppp minicom \
+  sg3-utils ppp wvdial minicom \
   iptables > /dev/null 2>&1
 log "Essential tools installed"
 

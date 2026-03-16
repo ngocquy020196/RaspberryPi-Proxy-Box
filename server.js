@@ -86,18 +86,70 @@ app.post('/api/proxy/config', async (req, res) => {
 app.post('/api/proxy/apply', async (req, res) => {
   try {
     const devices = await dcomScanner.scanDevices();
-    await proxyManager.regenerateAndReload(devices);
-    res.json({ success: true, message: '3proxy config applied' });
+    const result = await proxyManager.regenerateAndReload(devices);
+    res.json({ success: true, ...result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Rotate IP for a specific device
+// Connect a stick-mode modem via PPP
+app.post('/api/ppp/connect/:index', async (req, res) => {
+  try {
+    const index = parseInt(req.params.index) || 0;
+    const serialPort = req.body.serialPort || `/dev/ttyUSB${index * 2}`;
+    const result = await dcomScanner.connectStickModem(serialPort, index);
+    res.json({ success: result.success, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Disconnect a PPP interface
+app.post('/api/ppp/disconnect/:index', async (req, res) => {
+  try {
+    const index = parseInt(req.params.index) || 0;
+    const result = await dcomScanner.disconnectPPP(index);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Auto-connect all disconnected stick modems
+app.post('/api/ppp/connect-all', async (req, res) => {
+  try {
+    const devices = await dcomScanner.scanDevices();
+    const results = [];
+    let pppIndex = 0;
+
+    for (const device of devices) {
+      if (device.type === 'stick' && device.status === 'disconnected' && device.serialPort) {
+        const result = await dcomScanner.connectStickModem(device.serialPort, pppIndex);
+        results.push({ port: device.serialPort, ...result });
+        pppIndex++;
+      }
+    }
+
+    if (results.length === 0) {
+      res.json({ success: true, message: 'No disconnected stick modems found' });
+    } else {
+      res.json({ success: true, results });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Rotate IP for a specific device (auto-detect method)
 app.post('/api/rotate/:interfaceName', async (req, res) => {
   try {
     const { interfaceName } = req.params;
-    const method = req.body.method || process.env.IP_ROTATE_METHOD || 'hilink';
+    // Auto-detect method: PPP interfaces use 'interface', HiLink use 'hilink'
+    let method = req.body.method || process.env.IP_ROTATE_METHOD || 'hilink';
+    if (interfaceName.startsWith('ppp')) {
+      method = 'interface'; // PPP always uses interface restart
+    }
     const result = await ipRotator.rotateIP(interfaceName, method);
     res.json({ success: true, result });
   } catch (error) {
@@ -109,10 +161,14 @@ app.post('/api/rotate/:interfaceName', async (req, res) => {
 app.post('/api/rotate-all', async (req, res) => {
   try {
     const devices = await dcomScanner.scanDevices();
-    const method = req.body.method || process.env.IP_ROTATE_METHOD || 'hilink';
     const results = [];
     for (const device of devices) {
+      if (device.status !== 'active') continue;
       try {
+        let method = req.body.method || process.env.IP_ROTATE_METHOD || 'hilink';
+        if (device.type === 'stick' || device.interfaceName.startsWith('ppp')) {
+          method = 'interface';
+        }
         const result = await ipRotator.rotateIP(device.interfaceName, method);
         results.push({ interface: device.interfaceName, ...result });
       } catch (err) {

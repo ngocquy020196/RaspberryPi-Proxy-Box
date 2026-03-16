@@ -177,7 +177,7 @@
       return `
         <tr data-interface="${device.interfaceName}">
           <td>${index + 1}</td>
-          <td><strong>${device.interfaceName}</strong></td>
+          <td><strong>${device.interfaceName}</strong><br><small class="text-muted">${device.type || ''}</small></td>
           <td class="ip-cell">${device.ip}</td>
           <td class="ip-cell">${device.gateway}</td>
           <td class="port-cell">${port}</td>
@@ -185,6 +185,10 @@
           <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
           <td>
             <div class="action-group">
+              ${device.status === 'disconnected' && device.type === 'stick' ? `
+              <button class="btn btn-sm btn-accent connect-btn" data-index="${index}" data-port="${device.serialPort || ''}" title="Connect PPP">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </button>` : ''}
               <button class="btn btn-sm btn-accent rotate-btn" data-interface="${device.interfaceName}" title="Rotate IP" ${device.status !== 'active' ? 'disabled' : ''}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
               </button>
@@ -203,6 +207,10 @@
 
     document.querySelectorAll('.config-btn').forEach(btn => {
       btn.addEventListener('click', () => openConfigModal(btn));
+    });
+
+    document.querySelectorAll('.connect-btn').forEach(btn => {
+      btn.addEventListener('click', () => connectPPP(btn.dataset.index, btn.dataset.port));
     });
 
     // Show connect info for first active device
@@ -253,6 +261,7 @@
       case 'no-ip': return 'status-noip';
       case 'storage-mode': return 'status-storage';
       case 'rotating': return 'status-rotating';
+      case 'disconnected': return 'status-noip';
       default: return 'status-noip';
     }
   }
@@ -263,6 +272,7 @@
       case 'no-ip': return 'No IP';
       case 'storage-mode': return 'Storage Mode';
       case 'rotating': return 'Rotating...';
+      case 'disconnected': return 'Disconnected';
       default: return status;
     }
   }
@@ -301,6 +311,26 @@
 
     // Refresh after rotation
     setTimeout(() => loadDevices(), 2000);
+  }
+
+  async function connectPPP(index, serialPort) {
+    showToast(`Connecting PPP ${index}...`, 'info');
+    try {
+      const res = await fetch(`/api/ppp/connect/${index}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serialPort }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Connected! IP: ${data.ip}`, 'success');
+      } else {
+        showToast(`PPP failed: ${data.message || data.error}`, 'error');
+      }
+    } catch (error) {
+      showToast(`Error: ${error.message}`, 'error');
+    }
+    setTimeout(() => loadDevices(), 3000);
   }
 
   async function rotateAllIPs() {

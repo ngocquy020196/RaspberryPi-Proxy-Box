@@ -1,23 +1,34 @@
 /**
  * USB Dcom Scanner
  * Detects connected USB Dcom devices and maps them to network interfaces
- * Optimized for Vodafone K5160 (Huawei E3372)
+ * Supports both HiLink mode (USB ethernet) and Stick mode (serial/PPP)
  */
 
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
+const fs = require('fs');
 
 // Huawei USB Vendor ID
 const HUAWEI_VENDOR_ID = '12d1';
 
 // Known Huawei modem product IDs
 const HUAWEI_MODEM_PRODUCTS = {
-  '1506': 'Huawei E3372 (HiLink)',
-  '14dc': 'Huawei E3372 (Stick)',
-  '1c05': 'Huawei E3372h (HiLink)',
-  '14fe': 'Huawei K5160 (Storage/CD-ROM mode)',
-  '1f01': 'Huawei E3372h-320',
+  // HiLink mode (USB ethernet — plug and play)
+  '1506': { name: 'Huawei E3372 (HiLink)', mode: 'hilink' },
+  '1c05': { name: 'Huawei E3372h (HiLink)', mode: 'hilink' },
+  '1f01': { name: 'Huawei E3372h-320 (HiLink)', mode: 'hilink' },
+  // Stick mode (serial port — needs PPP/wvdial)
+  '1001': { name: 'Huawei E1550/E169/E620 (Stick)', mode: 'stick' },
+  '1003': { name: 'Huawei E220 (Stick)', mode: 'stick' },
+  '1406': { name: 'Huawei E1750 (Stick)', mode: 'stick' },
+  '14dc': { name: 'Huawei E3372 (Stick)', mode: 'stick' },
+  '1436': { name: 'Huawei E173 (Stick)', mode: 'stick' },
+  '1465': { name: 'Huawei K3765 (Stick)', mode: 'stick' },
+  // Storage/CD-ROM mode (needs usb_modeswitch)
+  '14fe': { name: 'Huawei K5160 (CD-ROM)', mode: 'storage' },
+  '1446': { name: 'Huawei E1752 (CD-ROM)', mode: 'storage' },
+  '1f01': { name: 'Huawei E3372 (CD-ROM)', mode: 'storage' },
 };
 
 /**
@@ -26,28 +37,74 @@ const HUAWEI_MODEM_PRODUCTS = {
  */
 async function scanDevices() {
   const usbDevices = await detectUSBModems();
-  const networkInterfaces = await getModemInterfaces();
-  
-  // Map USB devices to their network interfaces
   const devices = [];
-  
+
+  // --- HiLink devices: find USB ethernet interfaces ---
+  const networkInterfaces = await getModemInterfaces();
   for (const iface of networkInterfaces) {
     const ipInfo = await getInterfaceIP(iface);
     const gatewayIP = await getGatewayIP(iface);
-    
+
     devices.push({
       interfaceName: iface,
       ip: ipInfo.ip || 'N/A',
       subnet: ipInfo.subnet || 'N/A',
       gateway: gatewayIP || 'N/A',
       status: ipInfo.ip ? 'active' : 'no-ip',
-      type: iface.startsWith('eth') ? 'ethernet' : 'usb',
+      type: 'hilink',
     });
   }
 
-  // Add USB detection info
+  // --- Stick mode devices: find serial ports and PPP interfaces ---
+  const stickModems = usbDevices.filter(u => u.mode === 'stick');
+  if (stickModems.length > 0) {
+    const serialPorts = await getSerialPorts();
+    const pppInterfaces = await getPPPInterfaces();
+
+    // Group serial ports (each modem typically has 2-3 ports)
+    // Port 0 = modem/PPP, Port 1 = AT commands, Port 2 = diagnostic
+    const modemGroups = groupSerialPorts(serialPorts);
+
+    for (let i = 0; i < modemGroups.length; i++) {
+      const group = modemGroups[i];
+      const pppIface = pppInterfaces[i] || null;
+      const modemInfo = stickModems[i] || stickModems[0];
+
+      if (pppIface) {
+        // PPP connection active
+        const ipInfo = await getInterfaceIP(pppIface);
+        devices.push({
+          interfaceName: pppIface,
+          ip: ipInfo.ip || 'N/A',
+          subnet: ipInfo.subnet || 'N/A',
+          gateway: 'peer',
+          status: ipInfo.ip ? 'active' : 'no-ip',
+          type: 'stick',
+          serialPort: group.modemPort,
+          atPort: group.atPort,
+          usbInfo: modemInfo,
+        });
+      } else {
+        // PPP not connected — needs dial
+        devices.push({
+          interfaceName: `ppp${i}`,
+          ip: 'N/A',
+          subnet: 'N/A',
+          gateway: 'N/A',
+          status: 'disconnected',
+          type: 'stick',
+          serialPort: group.modemPort,
+          atPort: group.atPort,
+          usbInfo: modemInfo,
+          message: `Stick modem on ${group.modemPort} — needs PPP dial`,
+        });
+      }
+    }
+  }
+
+  // --- Storage mode devices: need usb_modeswitch ---
   for (const usb of usbDevices) {
-    if (usb.needsModeSwitch) {
+    if (usb.mode === 'storage') {
       devices.push({
         interfaceName: 'N/A',
         ip: 'N/A',
@@ -56,10 +113,12 @@ async function scanDevices() {
         status: 'storage-mode',
         type: 'usb-storage',
         usbInfo: usb,
-        message: 'Device in CD-ROM mode — needs usb_modeswitch'
+        message: 'Device in CD-ROM mode — needs usb_modeswitch',
       });
     }
   }
+
+  console.log(`[dcom-scanner] Found ${devices.length} device(s): ${devices.map(d => `${d.interfaceName}(${d.type}:${d.status})`).join(', ') || 'none'}`);
 
   return devices;
 }
@@ -78,15 +137,21 @@ async function detectUSBModems() {
       if (match) {
         const [, vendor, product] = match;
         if (vendor === HUAWEI_VENDOR_ID) {
+          const info = HUAWEI_MODEM_PRODUCTS[product] || { name: `Huawei Unknown (${product})`, mode: 'unknown' };
           modems.push({
             vendor,
             product,
-            name: HUAWEI_MODEM_PRODUCTS[product] || `Huawei Unknown (${product})`,
+            name: info.name,
+            mode: info.mode,
             raw: line.trim(),
-            needsModeSwitch: product === '14fe', // CD-ROM mode
           });
+          console.log(`[dcom-scanner] USB modem found: ${info.name} (${vendor}:${product}) — mode: ${info.mode}`);
         }
       }
+    }
+
+    if (modems.length === 0) {
+      console.log('[dcom-scanner] No Huawei USB modems found');
     }
 
     return modems;
@@ -97,21 +162,66 @@ async function detectUSBModems() {
 }
 
 /**
- * Get modem-related network interfaces
- * Uses both include patterns and sysfs USB detection
+ * Get serial ports for USB modems
+ */
+async function getSerialPorts() {
+  try {
+    const { stdout } = await execAsync('ls /dev/ttyUSB* 2>/dev/null');
+    return stdout.trim().split('\n').filter(p => p);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Group serial ports by modem (each modem creates 2-3 ttyUSB ports)
+ */
+function groupSerialPorts(ports) {
+  if (ports.length === 0) return [];
+
+  // Simple grouping: every 2-3 consecutive ports = 1 modem
+  // ttyUSB0 = modem (PPP), ttyUSB1 = AT commands
+  // ttyUSB2 = modem 2, ttyUSB3 = AT commands 2, etc.
+  const groups = [];
+  const portsPerModem = ports.length >= 4 ? Math.ceil(ports.length / Math.ceil(ports.length / 3)) : ports.length;
+  
+  for (let i = 0; i < ports.length; i += Math.max(2, portsPerModem)) {
+    groups.push({
+      modemPort: ports[i],                    // First port = PPP dial
+      atPort: ports[i + 1] || ports[i],       // Second port = AT commands
+      diagPort: ports[i + 2] || null,         // Third port = diagnostic (optional)
+    });
+  }
+
+  return groups;
+}
+
+/**
+ * Get active PPP interfaces
+ */
+async function getPPPInterfaces() {
+  try {
+    const { stdout } = await execAsync("ip -o link show | grep ppp | awk -F': ' '{print $2}'");
+    return stdout.trim().split('\n').filter(i => i);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get modem-related network interfaces (for HiLink mode)
  */
 async function getModemInterfaces() {
   try {
-    // Method 1: Find USB network interfaces via sysfs (most reliable)
+    // Method 1: Find USB network interfaces via sysfs
     let usbInterfaces = [];
     try {
       const { stdout: sysfsOut } = await execAsync(
         "ls -d /sys/class/net/*/device/driver 2>/dev/null | cut -d'/' -f5"
       );
       const sysfsIfaces = sysfsOut.trim().split('\n').filter(i => i);
-      
+
       for (const iface of sysfsIfaces) {
-        // Check if this interface is a USB device
         try {
           const { stdout: devPath } = await execAsync(
             `readlink -f /sys/class/net/${iface}/device 2>/dev/null`
@@ -123,42 +233,26 @@ async function getModemInterfaces() {
       }
     } catch {}
 
-    // Method 2: Pattern matching on interface names (fallback)
+    // Method 2: Pattern matching
     const { stdout } = await execAsync("ip -o link show | awk -F': ' '{print $2}'");
     const allInterfaces = stdout.trim().split('\n').map(i => i.trim()).filter(i => i);
 
-    // Include patterns for USB modem interfaces
-    // enx*: HiLink USB ethernet (most common for K5160)
-    // wwan*: cellular modem interfaces
-    // usb*: generic USB network
-    // eth1, eth2...: secondary ethernet (often USB modems)
-    const includePatterns = ['enx', 'wwan', 'usb', 'ppp'];
-    const excluded = ['lo', 'wlan', 'eth0', 'docker', 'br-', 'veth', 'virbr'];
+    const includePatterns = ['enx', 'wwan', 'usb'];
+    const excluded = ['lo', 'wlan', 'eth0', 'docker', 'br-', 'veth', 'virbr', 'ppp'];
 
     const patternMatched = allInterfaces.filter(iface => {
-      // Skip excluded
       for (const ex of excluded) {
         if (iface.startsWith(ex)) return false;
       }
-      // Include if matches known USB modem patterns
       for (const pat of includePatterns) {
         if (iface.startsWith(pat)) return true;
       }
-      // Include secondary eth interfaces (eth1, eth2, etc.)
       if (/^eth[1-9]/.test(iface)) return true;
       return false;
     });
 
-    // Merge both methods (unique)
     const merged = [...new Set([...usbInterfaces, ...patternMatched])];
-    
-    // Final filter: remove primary built-in interfaces
-    const result = merged.filter(i => !['lo', 'eth0', 'wlan0'].includes(i));
-    
-    console.log(`[dcom-scanner] Found interfaces: ${result.length > 0 ? result.join(', ') : 'none'}`);
-    console.log(`[dcom-scanner] All interfaces: ${allInterfaces.join(', ')}`);
-    
-    return result;
+    return merged.filter(i => !['lo', 'eth0', 'wlan0'].includes(i));
   } catch (error) {
     console.error('Error listing interfaces:', error.message);
     return [];
@@ -174,10 +268,7 @@ async function getInterfaceIP(interfaceName) {
       `ip -4 addr show ${interfaceName} 2>/dev/null | grep -oP 'inet \\K[\\d./]+'`
     );
     const parts = stdout.trim().split('/');
-    return {
-      ip: parts[0] || null,
-      subnet: parts[1] || null,
-    };
+    return { ip: parts[0] || null, subnet: parts[1] || null };
   } catch {
     return { ip: null, subnet: null };
   }
@@ -212,9 +303,8 @@ async function getSystemInfo() {
         .then(r => r.stdout.trim())
         .catch(() => 'N/A'),
     ]);
-
     return { hostname, uptime, cpuTemp, memory: memInfo };
-  } catch (error) {
+  } catch {
     return { hostname: 'unknown', uptime: 'unknown', cpuTemp: 'N/A', memory: 'N/A' };
   }
 }
@@ -231,6 +321,69 @@ async function switchModemMode(vendorId, productId) {
   }
 }
 
+/**
+ * Connect a stick-mode modem via wvdial/PPP
+ */
+async function connectStickModem(serialPort, pppIndex = 0) {
+  const wvdialConf = `/tmp/wvdial-ppp${pppIndex}.conf`;
+  const pppIface = `ppp${pppIndex}`;
+
+  // Generate wvdial config
+  const config = `[Dialer dcom${pppIndex}]
+Init1 = ATZ
+Init2 = ATQ0 V1 E1 S0=0
+Init3 = AT+CGDCONT=1,"IP","internet"
+Modem Type = Analog Modem
+Baud = 460800
+New PPPD = yes
+Modem = ${serialPort}
+Phone = *99#
+Username = " "
+Password = " "
+Stupid Mode = 1
+Auto DNS = 1
+`;
+
+  fs.writeFileSync(wvdialConf, config, 'utf-8');
+  console.log(`[dcom-scanner] wvdial config written: ${wvdialConf}`);
+
+  try {
+    // Kill any existing wvdial for this port
+    await execAsync(`pkill -f "wvdial.*dcom${pppIndex}" 2>/dev/null`).catch(() => {});
+    
+    // Start wvdial in background
+    await execAsync(`wvdial -C ${wvdialConf} dcom${pppIndex} &>/var/log/wvdial-ppp${pppIndex}.log &`);
+    
+    // Wait for PPP interface to appear
+    let retries = 15;
+    while (retries > 0) {
+      await new Promise(r => setTimeout(r, 2000));
+      const ipInfo = await getInterfaceIP(pppIface);
+      if (ipInfo.ip) {
+        console.log(`[dcom-scanner] PPP connected: ${pppIface} → ${ipInfo.ip}`);
+        return { success: true, interface: pppIface, ip: ipInfo.ip };
+      }
+      retries--;
+    }
+
+    return { success: false, message: 'PPP dial timed out — check /var/log/wvdial-ppp*.log' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Disconnect a PPP interface
+ */
+async function disconnectPPP(pppIndex = 0) {
+  try {
+    await execAsync(`pkill -f "wvdial.*dcom${pppIndex}" 2>/dev/null`);
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+}
+
 module.exports = {
   scanDevices,
   detectUSBModems,
@@ -238,4 +391,7 @@ module.exports = {
   getInterfaceIP,
   getSystemInfo,
   switchModemMode,
+  connectStickModem,
+  disconnectPPP,
+  getSerialPorts,
 };
