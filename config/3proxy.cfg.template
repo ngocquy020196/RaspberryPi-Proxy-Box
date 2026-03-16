@@ -1,0 +1,29 @@
+# ============================================
+# 3proxy Configuration — Auto-generated
+# DO NOT EDIT MANUALLY — managed by dcom-proxy
+# ============================================
+
+# Daemon mode
+daemon
+
+# PID file
+pidfile /var/run/3proxy.pid
+
+# Logging
+log /var/log/3proxy/3proxy.log D
+logformat "L%d-%m-%Y %H:%M:%S %z %N.%p %E %C:%c %R:%r %O %I %h %T"
+rotate 7
+
+# Timeouts
+timeouts 1 5 30 60 180 1800 15 60
+
+# DNS resolution
+nserver 8.8.8.8
+nserver 8.8.4.4
+nscache 65536
+
+# Max connections
+maxconn 500
+
+# ===== PROXY ENTRIES (auto-generated below) =====
+# {{PROXY_ENTRIES}}

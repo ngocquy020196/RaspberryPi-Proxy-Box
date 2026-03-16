@@ -1,0 +1,17 @@
+[Unit]
+Description=DCOM Proxy Box — Web Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={{INSTALL_DIR}}
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
