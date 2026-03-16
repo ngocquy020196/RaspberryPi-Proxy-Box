@@ -117,8 +117,7 @@ if ! grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
   read -p "Enter Cloudflare API Token [skip]: " CF_TOKEN
   if [ -n "$CF_TOKEN" ]; then
     read -p "Enter Zone ID: " CF_ZONE
-    read -p "Enter DDNS Domain [proxy-ddns.ngocquy.dev]: " CF_DOMAIN
-    CF_DOMAIN="${CF_DOMAIN:-proxy-ddns.ngocquy.dev}"
+    CF_DOMAIN="proxy-ddns.ngocquy.dev"
     echo "" >> "$INSTALL_DIR/.env"
     echo "# Cloudflare DDNS" >> "$INSTALL_DIR/.env"
     echo "CF_API_TOKEN=$CF_TOKEN" >> "$INSTALL_DIR/.env"
