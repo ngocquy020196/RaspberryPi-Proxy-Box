@@ -17,10 +17,10 @@
     sidebar: document.getElementById('sidebar'),
     sidebarToggle: document.getElementById('sidebarToggle'),
     logoutBtn: document.getElementById('logoutBtn'),
-    refreshBtn: document.getElementById('refreshBtn'),
+    refreshBtn: null,
     rotateAllBtn: document.getElementById('rotateAllBtn'),
     stopAllBtn: document.getElementById('stopAllBtn'),
-    applyProxyBtn: document.getElementById('applyProxyBtn'),
+    applyProxyBtn: null,
     deviceTableBody: document.getElementById('deviceTableBody'),
     totalDevices: document.getElementById('totalDevices'),
     activeDevices: document.getElementById('activeDevices'),
@@ -80,12 +80,7 @@
       window.location.href = '/';
     });
 
-    // Refresh
-    elements.refreshBtn.addEventListener('click', () => {
-      loadDevices();
-      loadSystemInfo();
-      showToast('Refreshed', 'info');
-    });
+
 
     // Rotate all
     elements.rotateAllBtn.addEventListener('click', rotateAllIPs);
@@ -93,8 +88,7 @@
     // Stop all
     elements.stopAllBtn.addEventListener('click', stopAll);
 
-    // Apply proxy config
-    elements.applyProxyBtn.addEventListener('click', applyProxyConfig);
+
 
     // Modal
     elements.modalClose.addEventListener('click', closeModal);
