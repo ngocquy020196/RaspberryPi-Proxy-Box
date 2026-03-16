@@ -25,7 +25,11 @@ cd /opt/dcom-proxy
 sudo bash setup.sh
 ```
 
-✅ Xong! Script tự động cài tất cả, tạo mật khẩu, khởi động services, và hiện link dashboard.
+✅ Xong! Script tự động:
+1. Cài Node.js, 3proxy, cloudflared, usb-modeswitch
+2. Tạo mật khẩu ngẫu nhiên + khởi động services
+3. **Hỏi bạn có muốn cấu hình Cloudflare Tunnel luôn không** (truy cập từ xa)
+4. Hiện link dashboard + mật khẩu
 
 ---
 
@@ -80,16 +84,40 @@ curl --socks5 proxyuser:proxypass@<PI_IP>:11000 https://api.ipify.org
 
 ## 🌍 Truy cập từ xa
 
-### Cloudflare Tunnel (Khuyên dùng)
+### Cloudflare Tunnel (Tích hợp sẵn trong setup.sh)
+
+Script cài đặt sẽ **hỏi bạn có muốn cấu hình Cloudflare Tunnel không** ở bước cuối.
+
+Nếu chọn **Có**, bạn chỉ cần:
+1. Đăng nhập Cloudflare (mở link trên trình duyệt)
+2. Nhập subdomain muốn dùng (VD: `proxy.yourdomain.com`)
+
+Script sẽ tự tạo tunnel, trỏ DNS, tạo config, và cài service.
+
+**Nếu bạn bỏ qua lúc cài đặt**, chạy thủ công sau:
 
 ```bash
 cloudflared tunnel login
 cloudflared tunnel create dcom-proxy
 cloudflared tunnel route dns dcom-proxy proxy.yourdomain.com
-cloudflared tunnel run dcom-proxy
+
+# Tạo config
+cat > ~/.cloudflared/config.yml << EOF
+tunnel: <TUNNEL_ID>
+credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
+ingress:
+  - hostname: proxy.yourdomain.com
+    service: http://localhost:8080
+  - service: http_status:404
+EOF
+
+# Chạy như service
+sudo cloudflared service install
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
 ```
 
-### Tailscale (Đơn giản nhất)
+### Tailscale (Phương án thay thế)
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh

@@ -55,7 +55,7 @@ echo "  ╚═══════════════════════
 echo -e "${NC}"
 echo ""
 
-TOTAL_STEPS=8
+TOTAL_STEPS=9
 CURRENT=0
 
 progress() {
@@ -262,6 +262,86 @@ systemctl restart dcom-proxy.service
 log "Tất cả services đã khởi động"
 
 # ========================================
+# STEP 9: Cloudflare Tunnel (Interactive)
+# ========================================
+progress "Cấu hình Cloudflare Tunnel"
+
+echo ""
+echo -e "${CYAN}Cloudflare Tunnel cho phép truy cập Dashboard từ xa qua domain.${NC}"
+echo -e "${YELLOW}Yêu cầu: Bạn cần có tài khoản Cloudflare và domain đã trỏ về CF.${NC}"
+echo ""
+read -p "Bạn có muốn cấu hình Cloudflare Tunnel ngay không? (y/N): " CF_CHOICE
+
+if [ "$CF_CHOICE" = "y" ] || [ "$CF_CHOICE" = "Y" ]; then
+  # Step 9a: Login
+  echo ""
+  info "Bước 1/4: Đăng nhập Cloudflare"
+  info "Trình duyệt sẽ mở — hãy đăng nhập và chọn domain."
+  info "Nếu dùng SSH không có trình duyệt, copy link hiện ra rồi mở trên máy khác."
+  echo ""
+  cloudflared tunnel login
+  
+  if [ $? -eq 0 ]; then
+    log "Đăng nhập thành công"
+    
+    # Step 9b: Create tunnel
+    info "Bước 2/4: Tạo tunnel"
+    TUNNEL_NAME="dcom-proxy"
+    cloudflared tunnel create $TUNNEL_NAME 2>/dev/null || warn "Tunnel '$TUNNEL_NAME' có thể đã tồn tại"
+    
+    # Get tunnel ID
+    TUNNEL_ID=$(cloudflared tunnel list 2>/dev/null | grep $TUNNEL_NAME | awk '{print $1}' | head -1)
+    
+    if [ -n "$TUNNEL_ID" ]; then
+      log "Tunnel ID: $TUNNEL_ID"
+      
+      # Step 9c: Get domain from user
+      echo ""
+      info "Bước 3/4: Cấu hình domain"
+      read -p "Nhập subdomain (VD: proxy.yourdomain.com): " CF_DOMAIN
+      
+      if [ -n "$CF_DOMAIN" ]; then
+        # Route DNS
+        cloudflared tunnel route dns $TUNNEL_NAME $CF_DOMAIN 2>/dev/null || warn "DNS route có thể đã tồn tại"
+        log "Đã trỏ $CF_DOMAIN → tunnel"
+        
+        # Step 9d: Generate config.yml
+        info "Bước 4/4: Tạo config và cài service"
+        CRED_FILE=$(ls /root/.cloudflared/*.json 2>/dev/null | head -1)
+        
+        mkdir -p /root/.cloudflared
+        cat > /root/.cloudflared/config.yml << CFEOF
+tunnel: ${TUNNEL_ID}
+credentials-file: ${CRED_FILE:-/root/.cloudflared/${TUNNEL_ID}.json}
+
+ingress:
+  - hostname: ${CF_DOMAIN}
+    service: http://localhost:8080
+  - service: http_status:404
+CFEOF
+        log "Config đã tạo tại /root/.cloudflared/config.yml"
+        
+        # Install as service
+        cloudflared service install 2>/dev/null || true
+        systemctl enable cloudflared 2>/dev/null || true
+        systemctl restart cloudflared 2>/dev/null || true
+        log "Cloudflare Tunnel đã khởi động"
+        
+        CF_URL="https://${CF_DOMAIN}"
+      else
+        warn "Bỏ qua — không nhập domain"
+      fi
+    else
+      warn "Không tìm thấy Tunnel ID — cấu hình thủ công sau"
+    fi
+  else
+    warn "Đăng nhập thất bại — cấu hình Cloudflare sau: xem docs/SETUP_GUIDE.md"
+  fi
+else
+  info "Bỏ qua Cloudflare Tunnel — cấu hình sau: xem docs/SETUP_GUIDE.md"
+fi
+
+# ========================================
 # DONE!
 # ========================================
 echo ""
@@ -272,7 +352,10 @@ echo -e "${GREEN}║   ${BOLD}✅ CÀI ĐẶT HOÀN TẤT!${NC}${GREEN}         
 echo -e "${GREEN}║                                                  ║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║${NC}                                                  ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC}  📡 Dashboard: ${CYAN}http://${PI_IP}:8080${NC}          ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}  📡 Dashboard (LAN):  ${CYAN}http://${PI_IP}:8080${NC}"
+if [ -n "$CF_URL" ]; then
+echo -e "${GREEN}║${NC}  🌍 Dashboard (WAN):  ${CYAN}${CF_URL}${NC}"
+fi
 echo -e "${GREEN}║${NC}  🔑 Mật khẩu:  ${YELLOW}${SECRET_KEY}${NC}              ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}                                                  ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC}  📂 Thư mục:   ${INSTALL_DIR}${NC}"
