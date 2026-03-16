@@ -54,7 +54,9 @@ async function getDeviceID(interfaceName, atPort) {
         `udevadm info -a /dev/${portName} 2>/dev/null | grep '{serial}' | head -1 | grep -oP '"[^"]+"' | tr -d '"'`
       );
       const serial = stdout.trim();
-      if (serial && serial.length > 3) return serial;
+      // Skip default/placeholder serials (not unique across devices)
+      const isDefault = /^[0-9A-F]{16}$/i.test(serial) || serial === '0123456789ABCDEF';
+      if (serial && serial.length > 3 && !isDefault) return serial;
     } catch {}
   }
 
