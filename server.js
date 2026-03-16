@@ -141,6 +141,32 @@ app.post('/api/ppp/connect-all', async (req, res) => {
   }
 });
 
+// Disconnect all PPP
+app.post('/api/ppp/disconnect-all', async (req, res) => {
+  try {
+    const devices = await dcomScanner.scanDevices();
+    let count = 0;
+    for (let i = 0; i < devices.length; i++) {
+      if (devices[i].type === 'stick' && devices[i].status === 'active') {
+        await dcomScanner.disconnectPPP(i);
+        count++;
+      }
+    }
+    // Also kill all pppd processes
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    await execAsync('sudo killall pppd 2>/dev/null').catch(() => {});
+    
+    // Stop 3proxy since no connections
+    await execAsync('sudo systemctl stop 3proxy 2>/dev/null').catch(() => {});
+    
+    res.json({ success: true, message: `Disconnected ${count} modem(s), 3proxy stopped` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Rotate IP for a specific device (auto-detect method)
 app.post('/api/rotate/:interfaceName', async (req, res) => {
   try {

@@ -19,6 +19,7 @@
     logoutBtn: document.getElementById('logoutBtn'),
     refreshBtn: document.getElementById('refreshBtn'),
     rotateAllBtn: document.getElementById('rotateAllBtn'),
+    stopAllBtn: document.getElementById('stopAllBtn'),
     applyProxyBtn: document.getElementById('applyProxyBtn'),
     deviceTableBody: document.getElementById('deviceTableBody'),
     totalDevices: document.getElementById('totalDevices'),
@@ -88,6 +89,9 @@
 
     // Rotate all
     elements.rotateAllBtn.addEventListener('click', rotateAllIPs);
+
+    // Stop all
+    elements.stopAllBtn.addEventListener('click', stopAll);
 
     // Apply proxy config
     elements.applyProxyBtn.addEventListener('click', applyProxyConfig);
@@ -192,6 +196,10 @@
               <button class="btn btn-sm btn-accent connect-btn" data-index="${index}" data-port="${device.serialPort || ''}" title="Connect PPP">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </button>` : ''}
+              ${device.status === 'active' && device.type === 'stick' ? `
+              <button class="btn btn-sm btn-danger stop-btn" data-index="${index}" title="Stop PPP">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              </button>` : ''}
               <button class="btn btn-sm btn-accent rotate-btn" data-interface="${device.interfaceName}" title="Rotate IP" ${device.status !== 'active' ? 'disabled' : ''}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
               </button>
@@ -217,6 +225,10 @@
 
     document.querySelectorAll('.connect-btn').forEach(btn => {
       btn.addEventListener('click', () => connectPPP(btn.dataset.index, btn.dataset.port));
+    });
+
+    document.querySelectorAll('.stop-btn').forEach(btn => {
+      btn.addEventListener('click', () => stopPPP(btn.dataset.index));
     });
 
     document.querySelectorAll('.copy-btn').forEach(btn => {
@@ -375,6 +387,34 @@
       showToast(`Error: ${error.message}`, 'error');
     }
     setTimeout(() => loadDevices(), 3000);
+  }
+
+  async function stopPPP(index) {
+    showToast(`Stopping PPP ${index}...`, 'info');
+    try {
+      const res = await fetch(`/api/ppp/disconnect/${index}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('PPP disconnected', 'success');
+      } else {
+        showToast('Failed to stop PPP', 'error');
+      }
+    } catch (error) {
+      showToast(`Error: ${error.message}`, 'error');
+    }
+    setTimeout(() => loadDevices(), 2000);
+  }
+
+  async function stopAll() {
+    showToast('Stopping all connections...', 'info');
+    try {
+      const res = await fetch('/api/ppp/disconnect-all', { method: 'POST' });
+      const data = await res.json();
+      showToast(data.message || 'All stopped', data.success ? 'success' : 'error');
+    } catch (error) {
+      showToast(`Error: ${error.message}`, 'error');
+    }
+    setTimeout(() => loadDevices(), 2000);
   }
 
   async function rotateAllIPs() {

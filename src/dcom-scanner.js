@@ -343,12 +343,14 @@ OK 'ATD*99#'
 CONNECT ''
 `;
 
-  // Create pppd peer config (no nodetach — must run as daemon!)
+  // Create pppd peer config
+  // NO defaultroute — Pi must keep WiFi/Ethernet as default route
+  // 3proxy uses 'external <ppp_ip>' to route proxy traffic through PPP
   const peerContent = `${serialPort}
 460800
 connect "/usr/sbin/chat -v -f ${chatScript}"
 noauth
-defaultroute
+nodefaultroute
 usepeerdns
 persist
 maxfail 3
