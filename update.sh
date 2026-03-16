@@ -108,8 +108,11 @@ if ! command -v tailscale &> /dev/null; then
   curl -fsSL https://tailscale.com/install.sh | sh
   systemctl enable tailscaled > /dev/null 2>&1
   systemctl start tailscaled > /dev/null 2>&1
-  log "Tailscale installed — run 'sudo tailscale up' to connect"
+  log "Tailscale installed"
 fi
+
+# Auto-connect Tailscale
+sudo tailscale up --accept-routes 2>&1 || true
 
 # Check results
 PI_IP=$(hostname -I | awk '{print $1}')
