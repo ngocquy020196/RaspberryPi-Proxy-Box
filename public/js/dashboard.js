@@ -304,9 +304,7 @@
     const el = document.getElementById('apiReference');
     if (!el) return;
 
-    const host = ddnsDomain || window.location.hostname;
-    const port = window.location.port || '8080';
-    const baseUrl = `http://${host}:${port}`;
+    const baseUrl = window.location.origin;
     const sampleMac = devices.length > 0 ? (devices[0].macAddress || 'MAC_ID') : 'MAC_ID';
     const maskedKey = apiKey ? apiKey.substring(0, 6) + '...' : 'YOUR_KEY';
 
