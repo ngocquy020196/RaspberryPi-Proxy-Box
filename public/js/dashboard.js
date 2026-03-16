@@ -279,17 +279,32 @@
     const user = config.username || 'proxyuser';
     const pass = config.password || 'proxypass';
     const proxyHost = ddnsDomain || window.location.hostname;
+    const curlCmd = `curl -x http://${user}:${pass}@${proxyHost}:${port} https://api.ipify.org`;
+    const proxyStr = `${user}:${pass}@${proxyHost}:${port}`;
 
     elements.connectInfo.innerHTML = `
       <p style="margin-bottom: 12px; color: var(--text-secondary); font-weight: 600;">Quick Connect — Proxy Settings</p>
-      <div class="connect-example">
-        <div><strong style="color: var(--primary);">📡 Proxy (curl)</strong></div>
-        <div>curl -x http://${user}:${pass}@${proxyHost}:${port} https://api.ipify.org</div>
-        <br>
-        <div><strong style="color: var(--text-secondary);">⚙️ SwitchyOmega / Browser Proxy</strong></div>
-        <div>Host: ${proxyHost} &nbsp; Port: ${port} &nbsp; User: ${user} &nbsp; Pass: ${pass}</div>
+      <div class="connect-example" style="font-size: 13px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <strong style="color: var(--primary);">📡 Proxy (curl)</strong>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
+          <code style="flex:1;background:var(--bg-tertiary);padding:6px 10px;border-radius:6px;font-size:12px;word-break:break-all;">${curlCmd}</code>
+          <button class="btn btn-sm btn-accent copy-line-btn" data-copy="${curlCmd.replace(/"/g, '&quot;')}" style="flex-shrink:0;">Copy</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <strong style="color: var(--primary);">🔗 Proxy String</strong>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
+          <code style="flex:1;background:var(--bg-tertiary);padding:6px 10px;border-radius:6px;font-size:12px;">${proxyStr}</code>
+          <button class="btn btn-sm btn-accent copy-line-btn" data-copy="${proxyStr}" style="flex-shrink:0;">Copy</button>
+        </div>
+        <div style="margin-bottom:4px;"><strong style="color: var(--text-secondary);">⚙️ SwitchyOmega</strong></div>
+        <div style="font-size:12px;color:var(--text-secondary);">Host: <strong>${proxyHost}</strong> &nbsp; Port: <strong>${port}</strong> &nbsp; User: <strong>${user}</strong> &nbsp; Pass: <strong>${pass}</strong></div>
       </div>
     `;
+
+    el_addCopyListeners(elements.connectInfo);
   }
 
   async function loadApiKey() {
@@ -306,46 +321,35 @@
     if (!el) return;
 
     const baseUrl = window.location.origin;
-    const sampleMac = devices.length > 0 ? (devices[0].macAddress || 'MAC_ID') : 'MAC_ID';
-    const maskedKey = apiKey ? apiKey.substring(0, 6) + '...' : 'YOUR_KEY';
+    const sampleId = devices.length > 0 ? (devices[0].macAddress || 'DEVICE_ID') : 'DEVICE_ID';
+    const key = apiKey || 'YOUR_KEY';
 
-    el.innerHTML = `
+    const endpoints = [
+      { label: '📋 List devices', url: `${baseUrl}/ext/api/devices?key=${key}` },
+      { label: '🔍 Device by ID', url: `${baseUrl}/ext/api/device/${encodeURIComponent(sampleId)}?key=${key}` },
+      { label: '🔄 Rotate IP', url: `${baseUrl}/ext/api/rotate/${encodeURIComponent(sampleId)}?key=${key}` },
+    ];
+
+    el.innerHTML = endpoints.map(ep => `
       <div style="margin-bottom: 10px;">
-        <strong style="color: var(--text-secondary);">🔑 API Key:</strong>
-        <code id="apiKeyDisplay" style="background: var(--bg-tertiary); padding: 2px 8px; border-radius: 4px; cursor: pointer;" title="Click to copy">${maskedKey}</code>
-        <button class="btn btn-sm btn-outline" id="showApiKeyBtn" style="margin-left: 6px; font-size: 11px;">Show</button>
-        <button class="btn btn-sm btn-accent" id="copyApiKeyBtn" style="margin-left: 4px; font-size: 11px;">Copy</button>
+        <div style="margin-bottom: 4px;"><strong style="color: var(--primary);">${ep.label}</strong></div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <code style="flex:1;background:var(--bg-tertiary);padding:6px 10px;border-radius:6px;font-size:12px;word-break:break-all;">${ep.url}</code>
+          <button class="btn btn-sm btn-accent copy-line-btn" data-copy="${ep.url.replace(/"/g, '&quot;')}" style="flex-shrink:0;">Copy</button>
+        </div>
       </div>
-      <div class="connect-example" style="font-size: 13px;">
-        <div><strong style="color: var(--primary);">📋 List all devices</strong></div>
-        <div>GET ${baseUrl}/ext/api/devices?key=API_KEY</div>
-        <br>
-        <div><strong style="color: var(--primary);">🔍 Get device by MAC</strong></div>
-        <div>GET ${baseUrl}/ext/api/device/${encodeURIComponent(sampleMac)}?key=API_KEY</div>
-        <br>
-        <div><strong style="color: var(--primary);">🔄 Rotate IP by MAC</strong></div>
-        <div>GET ${baseUrl}/ext/api/rotate/${encodeURIComponent(sampleMac)}?key=API_KEY</div>
-        <br>
-        <div><strong style="color: var(--text-secondary);">💡 curl example</strong></div>
-        <div>curl -H "x-api-key: API_KEY" ${baseUrl}/ext/api/devices</div>
-      </div>
-    `;
+    `).join('');
 
-    // Show/Copy API key handlers
-    document.getElementById('showApiKeyBtn')?.addEventListener('click', () => {
-      const display = document.getElementById('apiKeyDisplay');
-      if (display.textContent === maskedKey) {
-        display.textContent = apiKey;
-      } else {
-        display.textContent = maskedKey;
-      }
-    });
+    el_addCopyListeners(el);
+  }
 
-    document.getElementById('copyApiKeyBtn')?.addEventListener('click', () => {
-      navigator.clipboard.writeText(apiKey).then(() => {
-        const btn = document.getElementById('copyApiKeyBtn');
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 1500);
+  function el_addCopyListeners(container) {
+    container.querySelectorAll('.copy-line-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+          btn.textContent = 'Copied!';
+          setTimeout(() => btn.textContent = 'Copy', 1500);
+        });
       });
     });
   }
