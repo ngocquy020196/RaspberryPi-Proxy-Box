@@ -120,6 +120,8 @@
     }
   }
 
+  let tailscaleIP = null;
+
   async function loadSystemInfo() {
     try {
       const res = await fetch('/api/system');
@@ -129,6 +131,7 @@
         elements.uptime.textContent = data.info.uptime;
         elements.cpuTemp.textContent = data.info.cpuTemp;
         elements.memUsage.textContent = data.info.memory;
+        tailscaleIP = data.info.tailscaleIP || null;
       }
     } catch (error) {
       console.error('Failed to load system info:', error);
@@ -170,7 +173,7 @@
       const user = config.username || 'proxyuser';
       const pass = config.password || 'proxypass';
       const realPass = config.password || 'proxypass';
-      const proxyHost = window.location.hostname;
+      const proxyHost = tailscaleIP || window.location.hostname;
       const proxyString = `${user}:${realPass}@${proxyHost}:${port}`;
       const statusClass = getStatusClass(device.status);
       const statusLabel = getStatusLabel(device.status);

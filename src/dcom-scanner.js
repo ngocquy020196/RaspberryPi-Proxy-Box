@@ -297,7 +297,7 @@ async function getGatewayIP(interfaceName) {
  */
 async function getSystemInfo() {
   try {
-    const [hostname, uptime, cpuTemp, memInfo] = await Promise.all([
+    const [hostname, uptime, cpuTemp, memInfo, tailscaleIP] = await Promise.all([
       execAsync('hostname').then(r => r.stdout.trim()).catch(() => 'unknown'),
       execAsync('uptime -p').then(r => r.stdout.trim()).catch(() => 'unknown'),
       execAsync('cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null')
@@ -306,10 +306,13 @@ async function getSystemInfo() {
       execAsync("free -m | awk '/Mem:/ {printf \"%d/%dMB\", $3, $2}'")
         .then(r => r.stdout.trim())
         .catch(() => 'N/A'),
+      execAsync('tailscale ip -4 2>/dev/null')
+        .then(r => r.stdout.trim())
+        .catch(() => null),
     ]);
-    return { hostname, uptime, cpuTemp, memory: memInfo };
+    return { hostname, uptime, cpuTemp, memory: memInfo, tailscaleIP };
   } catch {
-    return { hostname: 'unknown', uptime: 'unknown', cpuTemp: 'N/A', memory: 'N/A' };
+    return { hostname: 'unknown', uptime: 'unknown', cpuTemp: 'N/A', memory: 'N/A', tailscaleIP: null };
   }
 }
 
