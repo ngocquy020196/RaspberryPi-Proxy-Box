@@ -123,6 +123,16 @@
   // ---- API Calls ----
 
   async function loadDevices() {
+    // Show loading on first load (no devices yet)
+    if (devices.length === 0) {
+      elements.deviceTableBody.innerHTML = `
+        <tr>
+          <td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary);">
+            <div style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+            <p style="margin-top:12px;">Loading devices...</p>
+          </td>
+        </tr>`;
+    }
     try {
       const res = await apiFetch('/api/devices');
       if (!res) return;
@@ -131,10 +141,24 @@
         devices = data.devices;
         renderDevices();
         updateStats();
+      } else {
+        showTableError(data.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Failed to load devices:', error);
+      showTableError(error.message || 'Connection failed');
     }
+  }
+
+  function showTableError(msg) {
+    elements.deviceTableBody.innerHTML = `
+      <tr>
+        <td colspan="10" style="text-align:center;padding:30px;">
+          <div style="color:#e74c3c;font-weight:600;">⚠️ Error loading devices</div>
+          <div style="color:var(--text-secondary);font-size:13px;margin-top:6px;">${msg}</div>
+          <div style="color:var(--text-secondary);font-size:12px;margin-top:8px;">Auto-retry in 15 seconds...</div>
+        </td>
+      </tr>`;
   }
 
 
