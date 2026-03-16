@@ -35,7 +35,8 @@ const HUAWEI_MODEM_PRODUCTS = {
 
 /**
  * Get unique device ID for a network interface
- * Priority: real MAC → IMEI (AT command) → USB serial → USB bus path
+ * For HiLink: MAC address from sysfs
+ * For Stick/PPP: USB serial from ttyUSB sysfs → IMEI via AT → bus path
  */
 async function getDeviceID(interfaceName, atPort) {
   // 1. Real MAC address (works for HiLink/USB ethernet)
@@ -45,34 +46,43 @@ async function getDeviceID(interfaceName, atPort) {
     if (mac && mac !== '00:00:00:00:00:00') return mac;
   } catch {}
 
-  // 2. IMEI via AT command (unique per modem, best for PPP/stick)
+  // 2. USB serial number via ttyUSB sysfs (most reliable for stick modems)
   if (atPort) {
     try {
+      const portName = atPort.replace('/dev/', '');
       const { stdout } = await execAsync(
-        `echo -e "AT+CGSN\\r" | timeout 3 socat - ${atPort},b115200,raw,echo=0 2>/dev/null`
+        `udevadm info -a /dev/${portName} 2>/dev/null | grep '{serial}' | head -1 | grep -oP '"[^"]+"' | tr -d '"'`
       );
-      const imeiMatch = stdout.match(/(\d{15})/);
-      if (imeiMatch) return `IMEI:${imeiMatch[1]}`;
+      const serial = stdout.trim();
+      if (serial && serial.length > 3) return serial;
     } catch {}
   }
 
-  // 3. USB device serial number
-  try {
-    const { stdout } = await execAsync(
-      `find /sys/class/net/${interfaceName}/ -name serial 2>/dev/null | head -1 | xargs cat 2>/dev/null`
-    );
-    const serial = stdout.trim();
-    if (serial) return `SN:${serial}`;
-  } catch {}
+  // 3. IMEI via AT command (try multiple baud rates)
+  if (atPort) {
+    for (const baud of [9600, 115200]) {
+      try {
+        const { stdout } = await execAsync(
+          `(echo -e "AT+CGSN\\r"; sleep 1) | socat - ${atPort},b${baud},raw,echo=0,crnl 2>/dev/null`,
+          { timeout: 5000 }
+        );
+        const imeiMatch = stdout.match(/(\d{15})/);
+        if (imeiMatch) return `IMEI:${imeiMatch[1]}`;
+      } catch {}
+    }
+  }
 
-  // 4. USB bus path (changes if plugged into different port)
-  try {
-    const { stdout } = await execAsync(
-      `udevadm info -q property /sys/class/net/${interfaceName} 2>/dev/null | grep ID_PATH= | cut -d= -f2`
-    );
-    const path = stdout.trim();
-    if (path) return `PATH:${path}`;
-  } catch {}
+  // 4. USB bus port path from ttyUSB (stable per physical port)
+  if (atPort) {
+    try {
+      const portName = atPort.replace('/dev/', '');
+      const { stdout } = await execAsync(
+        `udevadm info -q path /dev/${portName} 2>/dev/null | grep -oP 'usb\\d+/[\\d.-]+' | head -1`
+      );
+      const busPath = stdout.trim();
+      if (busPath) return `USB:${busPath}`;
+    } catch {}
+  }
 
   return 'N/A';
 }
