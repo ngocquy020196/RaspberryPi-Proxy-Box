@@ -104,6 +104,9 @@
     });
   }
 
+  // ---- State ----
+  let ddnsDomain = '';
+
   // ---- API Helper with 401 redirect ----
 
   async function apiFetch(url, options = {}) {
@@ -143,6 +146,7 @@
         elements.uptime.textContent = data.info.uptime;
         elements.cpuTemp.textContent = data.info.cpuTemp;
         elements.memUsage.textContent = data.info.memory;
+        ddnsDomain = data.info.ddnsDomain || '';
       }
     } catch (error) {
       console.error('Failed to load system info:', error);
@@ -185,7 +189,7 @@
       const user = config.username || 'proxyuser';
       const pass = config.password || 'proxypass';
       const realPass = config.password || 'proxypass';
-      const proxyHost = window.location.hostname;
+      const proxyHost = ddnsDomain || window.location.hostname;
       const proxyString = `${user}:${realPass}@${proxyHost}:${port}`;
       const statusClass = getStatusClass(device.status);
       const statusLabel = getStatusLabel(device.status);
@@ -270,16 +274,16 @@
     const port = config.port || 10000;
     const user = config.username || 'proxyuser';
     const pass = config.password || 'proxypass';
-    const localIP = window.location.hostname;
+    const proxyHost = ddnsDomain || window.location.hostname;
 
     elements.connectInfo.innerHTML = `
       <p style="margin-bottom: 12px; color: var(--text-secondary); font-weight: 600;">Quick Connect — Proxy Settings</p>
       <div class="connect-example">
         <div><strong style="color: var(--primary);">📡 Proxy (curl)</strong></div>
-        <div>curl -x http://${user}:${pass}@${localIP}:${port} https://api.ipify.org</div>
+        <div>curl -x http://${user}:${pass}@${proxyHost}:${port} https://api.ipify.org</div>
         <br>
         <div><strong style="color: var(--text-secondary);">⚙️ SwitchyOmega / Browser Proxy</strong></div>
-        <div>Host: ${localIP} &nbsp; Port: ${port} &nbsp; User: ${user} &nbsp; Pass: ${pass}</div>
+        <div>Host: ${proxyHost} &nbsp; Port: ${port} &nbsp; User: ${user} &nbsp; Pass: ${pass}</div>
       </div>
     `;
   }

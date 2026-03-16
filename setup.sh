@@ -268,6 +268,27 @@ log "All services started"
 
 
 # ========================================
+# STEP 9: Cloudflare DDNS (proxy-ddns.ngocquy.dev)
+# ========================================
+progress "Setting up Cloudflare DDNS"
+
+chmod +x "$INSTALL_DIR/scripts/ddns-update.sh" 2>/dev/null
+cp "$INSTALL_DIR/systemd/ddns-update.service" /etc/systemd/system/
+cp "$INSTALL_DIR/systemd/ddns-update.timer" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable ddns-update.timer > /dev/null 2>&1
+systemctl start ddns-update.timer > /dev/null 2>&1
+
+# Run first update
+if grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
+  bash "$INSTALL_DIR/scripts/ddns-update.sh"
+  DDNS_DOMAIN=$(grep "CF_DDNS_DOMAIN=" "$INSTALL_DIR/.env" 2>/dev/null | cut -d= -f2)
+  log "DDNS active: ${DDNS_DOMAIN:-proxy-ddns.ngocquy.dev}"
+else
+  warn "DDNS not configured — add CF_API_TOKEN and CF_ZONE_ID to .env"
+fi
+
+# ========================================
 # STEP 10: Cloudflare Tunnel (Interactive)
 # ========================================
 progress "Cloudflare Tunnel Setup"

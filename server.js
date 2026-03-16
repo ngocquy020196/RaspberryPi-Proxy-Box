@@ -54,6 +54,7 @@ app.get('/api/devices', async (req, res) => {
 app.get('/api/system', async (req, res) => {
   try {
     const info = await dcomScanner.getSystemInfo();
+    info.ddnsDomain = process.env.CF_DDNS_DOMAIN || '';
     res.json({ success: true, info });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
