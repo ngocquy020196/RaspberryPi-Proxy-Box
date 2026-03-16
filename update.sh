@@ -109,7 +109,27 @@ cp "$INSTALL_DIR/systemd/ddns-update.timer" /etc/systemd/system/ 2>/dev/null
 systemctl daemon-reload
 systemctl enable ddns-update.timer > /dev/null 2>&1
 systemctl restart ddns-update.timer > /dev/null 2>&1
+
+# Ask for DDNS config if not set
+if ! grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
+  echo ""
+  echo -e "${YELLOW}DDNS not configured. Set up Cloudflare DDNS for proxy domain?${NC}"
+  read -p "Enter Cloudflare API Token [skip]: " CF_TOKEN
+  if [ -n "$CF_TOKEN" ]; then
+    read -p "Enter Zone ID: " CF_ZONE
+    read -p "Enter DDNS Domain [proxy-ddns.ngocquy.dev]: " CF_DOMAIN
+    CF_DOMAIN="${CF_DOMAIN:-proxy-ddns.ngocquy.dev}"
+    echo "" >> "$INSTALL_DIR/.env"
+    echo "# Cloudflare DDNS" >> "$INSTALL_DIR/.env"
+    echo "CF_API_TOKEN=$CF_TOKEN" >> "$INSTALL_DIR/.env"
+    echo "CF_ZONE_ID=$CF_ZONE" >> "$INSTALL_DIR/.env"
+    echo "CF_DDNS_DOMAIN=$CF_DOMAIN" >> "$INSTALL_DIR/.env"
+    info "DDNS config saved"
+  fi
+fi
+
 if grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
+  source "$INSTALL_DIR/.env"
   bash "$INSTALL_DIR/scripts/ddns-update.sh"
 fi
 

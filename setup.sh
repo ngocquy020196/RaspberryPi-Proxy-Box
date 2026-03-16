@@ -268,7 +268,7 @@ log "All services started"
 
 
 # ========================================
-# STEP 9: Cloudflare DDNS (proxy-ddns.ngocquy.dev)
+# STEP 9: Cloudflare DDNS (proxy domain)
 # ========================================
 progress "Setting up Cloudflare DDNS"
 
@@ -279,13 +279,46 @@ systemctl daemon-reload
 systemctl enable ddns-update.timer > /dev/null 2>&1
 systemctl start ddns-update.timer > /dev/null 2>&1
 
+# Ask for DDNS config if not set
+if ! grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
+  echo ""
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "  Cloudflare DDNS — auto-update domain with Pi's IP"
+  echo -e "  Customers use this domain to connect to proxy"
+  echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo -e "Get API Token: ${YELLOW}https://dash.cloudflare.com/profile/api-tokens${NC}"
+  echo "  → Create Token → Edit zone DNS → select your domain"
+  echo ""
+  echo -e "Get Zone ID: ${YELLOW}Cloudflare Dashboard → your domain → Overview → right sidebar${NC}"
+  echo ""
+  read -p "$(echo -e ${GREEN}Enter Cloudflare API Token ${NC}[skip to configure later]: )" CF_TOKEN
+  if [ -n "$CF_TOKEN" ]; then
+    read -p "$(echo -e ${GREEN}Enter Zone ID: ${NC})" CF_ZONE
+    read -p "$(echo -e ${GREEN}Enter DDNS Domain ${NC}[proxy-ddns.ngocquy.dev]: )" CF_DOMAIN
+    CF_DOMAIN="${CF_DOMAIN:-proxy-ddns.ngocquy.dev}"
+
+    # Append to .env
+    echo "" >> "$INSTALL_DIR/.env"
+    echo "# Cloudflare DDNS" >> "$INSTALL_DIR/.env"
+    echo "CF_API_TOKEN=$CF_TOKEN" >> "$INSTALL_DIR/.env"
+    echo "CF_ZONE_ID=$CF_ZONE" >> "$INSTALL_DIR/.env"
+    echo "CF_DDNS_DOMAIN=$CF_DOMAIN" >> "$INSTALL_DIR/.env"
+    log "DDNS config saved to .env"
+  else
+    warn "DDNS skipped — configure later in .env"
+  fi
+fi
+
 # Run first update
 if grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
+  # Re-source .env to pick up new values
+  source "$INSTALL_DIR/.env"
   bash "$INSTALL_DIR/scripts/ddns-update.sh"
   DDNS_DOMAIN=$(grep "CF_DDNS_DOMAIN=" "$INSTALL_DIR/.env" 2>/dev/null | cut -d= -f2)
   log "DDNS active: ${DDNS_DOMAIN:-proxy-ddns.ngocquy.dev}"
 else
-  warn "DDNS not configured — add CF_API_TOKEN and CF_ZONE_ID to .env"
+  warn "DDNS not active — add CF_API_TOKEN and CF_ZONE_ID to .env"
 fi
 
 # ========================================
