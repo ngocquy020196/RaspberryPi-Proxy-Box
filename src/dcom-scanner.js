@@ -344,18 +344,18 @@ CONNECT ''
 `;
 
   // Create pppd peer config
-  // NO defaultroute — Pi must keep WiFi/Ethernet as default route
+  // nodefaultroute — Pi keeps WiFi as default route
+  // NO usepeerdns — Pi keeps its own DNS servers
   // 3proxy uses 'external <ppp_ip>' to route proxy traffic through PPP
   const peerContent = `${serialPort}
 460800
 connect "/usr/sbin/chat -v -f ${chatScript}"
 noauth
 nodefaultroute
-usepeerdns
+noipdefault
 persist
 maxfail 3
 holdoff 10
-noipdefault
 logfile /var/log/ppp-${peerName}.log
 `;
 
