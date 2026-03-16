@@ -114,20 +114,24 @@ systemctl restart ddns-update.timer > /dev/null 2>&1
 if ! grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
   echo ""
   echo -e "${YELLOW}DDNS not configured. Set up Cloudflare DDNS for proxy domain?${NC}"
-  read -p "Enter Cloudflare API Token [skip]: " CF_TOKEN
-  if [ -n "$CF_TOKEN" ]; then
-    read -p "Enter Zone ID: " CF_ZONE
-    read -p "Enter DDNS Domain (e.g. proxy.yourdomain.com): " CF_DOMAIN
-    while [ -z "$CF_DOMAIN" ]; do
-      read -p "Domain is required: " CF_DOMAIN
-    done
-    echo "" >> "$INSTALL_DIR/.env"
-    echo "# Cloudflare DDNS" >> "$INSTALL_DIR/.env"
-    echo "CF_API_TOKEN=$CF_TOKEN" >> "$INSTALL_DIR/.env"
-    echo "CF_ZONE_ID=$CF_ZONE" >> "$INSTALL_DIR/.env"
-    echo "CF_DDNS_DOMAIN=$CF_DOMAIN" >> "$INSTALL_DIR/.env"
-    info "DDNS config saved"
-  fi
+  read -p "Enter Cloudflare API Token: " CF_TOKEN
+  while [ -z "$CF_TOKEN" ]; do
+    read -p "API Token is required: " CF_TOKEN
+  done
+  read -p "Enter Zone ID: " CF_ZONE
+  while [ -z "$CF_ZONE" ]; do
+    read -p "Zone ID is required: " CF_ZONE
+  done
+  read -p "Enter DDNS Domain (e.g. proxy.yourdomain.com): " CF_DOMAIN
+  while [ -z "$CF_DOMAIN" ]; do
+    read -p "Domain is required: " CF_DOMAIN
+  done
+  echo "" >> "$INSTALL_DIR/.env"
+  echo "# Cloudflare DDNS" >> "$INSTALL_DIR/.env"
+  echo "CF_API_TOKEN=$CF_TOKEN" >> "$INSTALL_DIR/.env"
+  echo "CF_ZONE_ID=$CF_ZONE" >> "$INSTALL_DIR/.env"
+  echo "CF_DDNS_DOMAIN=$CF_DOMAIN" >> "$INSTALL_DIR/.env"
+  info "DDNS config saved"
 fi
 
 if grep -q "CF_API_TOKEN=.\+" "$INSTALL_DIR/.env" 2>/dev/null; then
