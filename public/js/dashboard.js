@@ -571,6 +571,13 @@
   }
 
   async function saveDeviceConfig() {
+    const submitBtn = document.getElementById('configSubmitBtn');
+    const originalText = submitBtn.innerHTML;
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="btn-spinner"></span> Đang áp dụng...';
+
     const formData = {
       interfaceName: elements.configInterface.value,
       port: parseInt(elements.configPort.value),
@@ -597,6 +604,10 @@
       }
     } catch (error) {
       showToast(`Error: ${error.message}`, 'error');
+    } finally {
+      // Restore button state
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
     }
   }
 
