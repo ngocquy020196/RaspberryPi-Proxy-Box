@@ -15,7 +15,7 @@ Complete guide to install and configure the Raspberry Pi 4G Proxy Box system.
 Power Supply → Pi → USB Hub (powered) → Dcom 1, Dcom 2, ...
 ```
 
-> ⚠️ **Do NOT plug Dcoms directly into Pi USB ports.** Pi can only supply ~1.2A total across all USB ports. Each Dcom uses ~0.5A. Use a powered USB hub.
+> **Do NOT plug Dcoms directly into Pi USB ports.** Pi can only supply ~1.2A total across all USB ports. Each Dcom uses ~0.5A. Use a powered USB hub.
 
 ---
 
@@ -98,9 +98,9 @@ Auto-updates your domain with Pi's public WiFi IP every 5 minutes.
 ### DNS Record Settings
 - Type: `A`
 - Name: your DDNS subdomain (e.g., `ddns-proxy`)
-- Proxy status: **DNS only** (☁️ grey cloud, NOT 🟠 orange)
+- Proxy status: **DNS only** (grey cloud, NOT orange)
 
-> ⚠️ Proxy status MUST be "DNS only" for TCP proxy to work. Orange cloud = Cloudflare CDN proxy = blocks TCP connections.
+> Proxy status MUST be "DNS only" for TCP proxy to work. Orange cloud = Cloudflare CDN proxy = blocks TCP connections.
 
 ### Verify DDNS
 ```bash
@@ -212,7 +212,7 @@ sudo usb_modeswitch -v 0x12d1 -p 0x14fe \
 
 ### DDNS Domain Not Resolving
 1. Check Cloudflare DNS record exists (A record)
-2. Ensure proxy status is **DNS only** (grey cloud ☁️)
+2. Ensure proxy status is **DNS only** (grey cloud)
 3. Flush local DNS: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`
 4. Verify: `nslookup ddns-proxy.yourdomain.com`
 

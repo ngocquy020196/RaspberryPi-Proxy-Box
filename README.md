@@ -1,4 +1,4 @@
-# 🚀 DCOM Proxy Box
+# DCOM Proxy Box
 
 Turn your Raspberry Pi into a professional 4G Proxy Station using multiple USB Dcom modems.
 
@@ -8,7 +8,7 @@ Turn your Raspberry Pi into a professional 4G Proxy Station using multiple USB D
 
 ---
 
-## ⚡ One-Command Install
+## One-Command Install
 
 SSH into your Raspberry Pi and run:
 
@@ -24,7 +24,7 @@ cd /opt/dcom-proxy
 sudo bash setup.sh
 ```
 
-✅ The setup script automatically:
+The setup script automatically:
 1. Installs Node.js, 3proxy, cloudflared, usb-modeswitch, ppp
 2. Generates a random password & starts all services
 3. **Configures Cloudflare DDNS** (auto-update domain with Pi's public IP)
@@ -33,37 +33,37 @@ sudo bash setup.sh
 
 ---
 
-## 📋 Features
+## Features
 
 | Feature | Description |
 |---------|-------------|
-| 🌐 **Multi-Proxy** | Each USB Dcom = 1 dedicated proxy (HTTP + SOCKS5) |
-| 🔄 **IP Rotation** | Change 4G IP with 1 click — resets uptime |
-| 🖥️ **Web Dashboard** | Clean light theme, responsive mobile, real-time monitoring 🚀 |
-| 🔒 **Security** | Secret key login, per-device proxy authentication |
-| 🌍 **Remote Access** | Cloudflare Tunnel (dashboard) + DDNS + Port Forward (proxy) |
-| 📡 **DDNS** | Auto-update domain with Pi's public IP every 5 minutes |
-| 📋 **Quick Connect** | Copy curl commands & proxy strings with 1 click |
-| 🔑 **External API** | GET endpoints with API key — list, status, rotate by Device ID |
-| ⏱️ **Uptime** | Per-device uptime tracking, resets on IP rotate |
-| 🆔 **Device ID** | Unique MD5 hash (8 chars) per device for API access |
-| 🔌 **Plug & Play** | Plug in Dcom → auto-detect, auto-switch mode, auto-connect |
-| ⚙️ **Auto-start** | All services start on boot (systemd) |
+| **Multi-Proxy** | Each USB Dcom = 1 dedicated proxy (HTTP + SOCKS5) |
+| **IP Rotation** | Change 4G IP with 1 click — resets uptime |
+| **Web Dashboard** | Clean light theme, responsive mobile, real-time monitoring |
+| **Security** | Secret key login, per-device proxy authentication |
+| **Remote Access** | Cloudflare Tunnel (dashboard) + DDNS + Port Forward (proxy) |
+| **DDNS** | Auto-update domain with Pi's public IP every 5 minutes |
+| **Quick Connect** | Copy curl commands & proxy strings with 1 click |
+| **External API** | GET endpoints with API key — list, status, rotate by Device ID |
+| **Uptime** | Per-device uptime tracking, resets on IP rotate |
+| **Device ID** | Unique MD5 hash (8 chars) per device for API access |
+| **Plug & Play** | Plug in Dcom → auto-detect, auto-switch mode, auto-connect |
+| **Auto-start** | All services start on boot (systemd) |
 
 ---
 
-## 🖥️ Hardware Requirements
+## Hardware Requirements
 
 - **Raspberry Pi** (3B+/4/5) — running Raspberry Pi OS / Debian
 - **Powered USB Hub** — required for multiple Dcoms (Pi USB ports can't supply enough power)
 - **Power Supply** — 5V/3A minimum for Pi
 - **USB 4G Dcom**: Vodafone K5160 / Huawei E3372 / E1550 (HiLink or Stick mode)
 
-> ⚠️ **Important:** Always use a powered USB hub. Plugging multiple Dcoms directly into Pi causes power issues and crashes.
+> **Important:** Always use a powered USB hub. Plugging multiple Dcoms directly into Pi causes power issues and crashes.
 
 ---
 
-## 📡 Usage
+## Usage
 
 ### 1. Access Dashboard
 
@@ -104,7 +104,7 @@ curl --socks5 proxyuser:proxypass@<DDNS_DOMAIN>:11000 https://api.ipify.org
 
 ---
 
-## 🌍 Remote Access Setup
+## Remote Access Setup
 
 ### Cloudflare Tunnel (Dashboard)
 
@@ -117,7 +117,7 @@ Configured automatically during `setup.sh`. All fields are **required**:
 - **Zone ID** (from Cloudflare dashboard)
 - **DDNS Domain** (e.g., `ddns-proxy.yourdomain.com`)
 
-> ⚠️ DDNS domain must be set to **DNS only** (grey cloud ☁️) in Cloudflare, NOT proxied (orange 🟠).
+> DDNS domain must be set to **DNS only** (grey cloud) in Cloudflare, NOT proxied (orange).
 
 ### Port Forwarding (Router)
 
@@ -130,7 +130,7 @@ Required for proxy access from outside your network:
 
 ---
 
-## 🔑 External API
+## External API
 
 Authenticated with `SECRET_KEY` (same as dashboard login password). Pass via `?key=` query param or `x-api-key` header. All endpoints use **GET**.
 
@@ -187,7 +187,7 @@ curl "https://proxy.yourdomain.com/ext/api/rotate/a1b2c3d4?key=YOUR_KEY"
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── setup.sh              # One-command installer
@@ -200,7 +200,7 @@ curl "https://proxy.yourdomain.com/ext/api/rotate/a1b2c3d4?key=YOUR_KEY"
 │   └── ip-rotator.js     # IP rotation (3 methods)
 ├── scripts/
 │   └── ddns-update.sh    # Cloudflare DDNS updater
-├── public/               # Dashboard UI (light theme, favicon 🚀)
+├── public/               # Dashboard UI (light theme)
 │   ├── index.html        # Login page
 │   ├── dashboard.html    # Main dashboard
 │   ├── css/style.css     # Light theme styles
@@ -212,7 +212,7 @@ curl "https://proxy.yourdomain.com/ext/api/rotate/a1b2c3d4?key=YOUR_KEY"
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 The `.env` file is auto-generated during setup:
 
@@ -230,7 +230,7 @@ The `.env` file is auto-generated during setup:
 
 ---
 
-## 🛠️ Management
+## Management
 
 ```bash
 # Update to latest version
@@ -264,6 +264,6 @@ All services are enabled by default and start on boot:
 
 ---
 
-## 📝 License
+## License
 
 MIT License — Free to use and modify.
